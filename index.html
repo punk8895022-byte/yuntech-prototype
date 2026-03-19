@@ -3053,6 +3053,7 @@ const ProfileModal = ({ user, onClose }) => {
 };
 
 const TechView = ({ user }) => {
+  const [infoTab, setInfoTab] = useState("contact");
   const { jobs, setJobs, users, withdrawals, logout, updateUser, requestWithdrawal } = useApp();
   const [selectedJob, setSelectedJob] = useState(null);
   const [tab, setTab] = useState("market");
