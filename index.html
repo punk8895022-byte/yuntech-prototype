@@ -3053,7 +3053,7 @@ const ProfileModal = ({ user, onClose }) => {
 };
 
 const TechView = ({ user }) => {
-  const [infoTab, setInfoTab] = useState("contact");
+  
   const { jobs, setJobs, users, withdrawals, logout, updateUser, requestWithdrawal } = useApp();
   const [selectedJob, setSelectedJob] = useState(null);
   const [tab, setTab] = useState("market");
@@ -3064,7 +3064,7 @@ const TechView = ({ user }) => {
   const [chatJob, setChatJob] = useState(null);
   const chatPeer = chatJob ? users.find((u) => u.id === chatJob.clientId) : null;
   const [nav, setNav] = useState("jobs");
-
+  const [infoTab, setInfoTab] = useState("contact");
 
 
   const marketJobs = jobs.filter((j) => j.status === "open");
