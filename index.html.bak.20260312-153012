@@ -1,0 +1,3350 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>雲程數位 | 智慧工務 SaaS (v101)</title>
+
+    <!-- 1. 核心庫 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- 2. 字體 -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style type="text/tailwindcss">
+      :root {
+        --primary: #6366f1;
+        --primary-dark: #4338ca;
+        --secondary: #f43f5e;
+        --bg-body: #f8fafc;
+        --surface: #ffffff;
+      }
+
+      body {
+        font-family: "Noto Sans TC", sans-serif;
+        background-color: var(--bg-body);
+        color: #334155;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .font-num {
+        font-family: "Plus Jakarta Sans", sans-serif;
+      }
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+
+      .animate-enter {
+        animation: enter 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      }
+      @keyframes enter {
+        from {
+          opacity: 0;
+          transform: translateY(10px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .animate-slide-down {
+        animation: slideDown 0.3s ease-out forwards;
+      }
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+      }
+
+      .card-modern {
+        background: white;
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        border: 1px solid #f1f5f9;
+        transition: all 0.2s ease;
+      }
+      .card-modern:hover {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+        transform: translateY(-2px);
+        border-color: #e2e8f0;
+      }
+      .card-modern:active {
+        transform: scale(0.99);
+      }
+
+      .btn {
+        padding: 0.75rem 1.25rem;
+        border-radius: 0.75rem;
+        font-weight: 700;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        letter-spacing: 0.025em;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        user-select: none;
+      }
+      .btn:active {
+        transform: scale(0.95);
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+      }
+
+      .btn-outline {
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        background: white;
+      }
+      .btn-outline:hover {
+        background: #f8fafc;
+      }
+
+      .input-modern {
+        width: 100%;
+        padding: 0.75rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        color: #334155;
+        transition: all 0.15s ease;
+        outline: none;
+      }
+      .input-modern:focus {
+        background: white;
+        border-color: #818cf8;
+        box-shadow: 0 0 0 4px rgba(224, 231, 255, 0.9);
+      }
+
+      canvas {
+        touch-action: none;
+        background: white;
+        cursor: crosshair;
+        border-radius: 0.75rem;
+        border: 2px dashed #cbd5e1;
+      }
+
+      .category-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        border-radius: 1rem;
+        border: 1px solid #e2e8f0;
+        transition: all 0.2s ease;
+      }
+      .category-btn.active {
+        border-color: #6366f1;
+        background: #eef2ff;
+        color: #4338ca;
+        box-shadow: 0 0 0 2px rgba(199, 210, 254, 0.8);
+      }
+      .category-btn.inactive {
+        border-color: #f1f5f9;
+        background: white;
+        color: #64748b;
+      }
+      .category-btn.inactive:hover {
+        border-color: #cbd5e1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+
+
+
+
+
+
+const { useState, useEffect, useMemo, useContext, createContext } = React;
+
+// --- [0. Core: Icon System] ---
+const Icon = ({ name, size = 20, className = "", ...props }) => {
+  useEffect(() => {
+    if (window.lucide) window.lucide.createIcons();
+  }, [name]);
+
+  return (
+    <i
+      data-lucide={name}
+      className={className}
+      style={{
+        width: size,
+        height: size,
+        display: "inline-block",
+        verticalAlign: "middle",
+        ...props.style,
+      }}
+    />
+  );
+};
+
+// --- [1. Database & Constants] ---
+const PROJECT_CATEGORIES = [
+  {
+    id: "weak",
+    label: "弱電工程",
+    icon: "zap",
+    color: "blue",
+    subItems: [
+      { id: "w1", name: "電話總機分機", unit: "式", price: 1500, labor: 1000 },
+      { id: "w2", name: "對講機安裝", unit: "式", price: 3000, labor: 1500 },
+      { id: "w3", name: "廣播喇叭", unit: "只", price: 2500, labor: 1200 },
+    ],
+  },
+  {
+    id: "net",
+    label: "網路工程",
+    icon: "wifi",
+    color: "cyan",
+    subItems: [
+      { id: "n1", name: "網路佈線 (Cat.6)", unit: "點", price: 2200, labor: 1200 },
+      { id: "n2", name: "Wi-Fi AP 安裝", unit: "台", price: 4500, labor: 1500 },
+      { id: "n3", name: "網路機櫃整線", unit: "式", price: 5000, labor: 5000 },
+      { id: "n4", name: "路由器設定", unit: "台", price: 2000, labor: 2000 },
+    ],
+  },
+  {
+    id: "cctv",
+    label: "監視器",
+    icon: "video",
+    color: "rose",
+    subItems: [
+      { id: "c1", name: "槍型攝影機 (含線)", unit: "支", price: 3500, labor: 1500 },
+      { id: "c2", name: "半球型攝影機 (含線)", unit: "支", price: 3500, labor: 1500 },
+      { id: "c3", name: "4路 NVR 主機", unit: "台", price: 4500, labor: 1000 },
+      { id: "c4", name: "8路 NVR 主機", unit: "台", price: 7500, labor: 1000 },
+    ],
+  },
+  {
+    id: "access",
+    label: "門禁系統",
+    icon: "key",
+    color: "emerald",
+    subItems: [
+      { id: "a1", name: "磁力鎖安裝", unit: "組", price: 4000, labor: 2000 },
+      { id: "a2", name: "陽極鎖安裝", unit: "組", price: 4500, labor: 2500 },
+      { id: "a3", name: "感應讀卡機", unit: "台", price: 3500, labor: 1500 },
+      { id: "a4", name: "開門按鈕", unit: "顆", price: 800, labor: 500 },
+    ],
+  },
+  { id: "info", label: "資訊工程", icon: "server", color: "indigo", subItems: [{ id: "i1", name: "伺服器上架", unit: "式", price: 3000, labor: 3000 }] },
+  { id: "pc", label: "電腦維修", icon: "monitor", color: "slate", subItems: [{ id: "p1", name: "系統重灌", unit: "台", price: 800, labor: 800 }] },
+];
+
+const SUPPLIES_DB = [
+  { id: "s1", name: "Cat.6 網路線 (箱)", unit: "箱", price: 4200 },
+  { id: "s2", name: "Cat.6 資訊插座", unit: "顆", price: 250 },
+  { id: "s3", name: "RJ45 水晶頭", unit: "顆", price: 15 },
+  { id: "s4", name: "PVC 4分管", unit: "支", price: 90 },
+  { id: "s5", name: "500萬畫素 IPCam", unit: "台", price: 3500 },
+  { id: "s6", name: "8路 NVR 主機", unit: "台", price: 8500 },
+  { id: "s7", name: "陽極鎖 (斷電開)", unit: "組", price: 2200 },
+  { id: "s8", name: "Mifare 感應扣", unit: "個", price: 30 },
+  { id: "s9", name: "1TB 監控硬碟", unit: "顆", price: 1800 },
+  { id: "s10", name: "五金另料 (乙式)", unit: "式", price: 500 },
+];
+
+const WEAK_CURRENT_SUPPLIES = SUPPLIES_DB;
+
+const DB_DEFAULTS = {
+  users: [
+    { id: "admin", role: "admin", name: "總部管理員", email: "admin", password: "123", avatar: "A", wallet: 9999999 },
+    { id: "tech1", role: "engineer", name: "王小明", email: "tech", password: "123", title: "資深弱電技師", rating: 4.9, jobs: 156, skills: ["光纖", "監控"], wallet: 12500, avatar: "王", status: "verified", experience: "8年" , phone: "0912-345-678" },
+    { id: "client1", role: "client_business", name: "陳經理", email: "client", password: "123", company: "台積電", address: "台南市善化區南科三路100號", wallet: 500000, avatar: "陳", status: "active", taxId: "12345678" , phone: "0900-111-222" },
+  ],
+  jobs: [
+    {
+      id: "J-2026021501",
+      title: "機房 Cat.6A 網路佈線",
+      type: "網路工程",
+      status: "active",
+      clientId: "client1",
+      assignee: "tech1",
+      clientName: "陳經理",
+      address: "台南市善化區南科三路100號",
+      desc: "機房新增 24 port Patch Panel，需包含整線。",
+      laborBudget: 12000,
+      materialBudget: 8000,
+      deposit_paid: true,
+      created_at: new Date().toISOString(),
+      materials: [],
+    },
+    {
+      id: "J-2026021502",
+      title: "門口對講機維修",
+      type: "弱電工程",
+      status: "completed",
+      clientId: "client1",
+      assignee: "tech1",
+      clientName: "陳經理",
+      address: "台南市永康區中華路",
+      desc: "對講機無聲音，需檢測線路。",
+      laborBudget: 2000,
+      materialBudget: 500,
+      deposit_paid: true,
+      created_at: new Date(Date.now() - 86400000).toISOString(),
+      materials: [],
+    },
+  ],
+};
+
+const normalizeJob = (job) => {
+  const laborBudget = Number.parseInt(job.laborBudget ?? job.budget_labor ?? job.labor ?? 0, 10) || 0;
+  const materialBudget = Number.parseInt(job.materialBudget ?? job.budget_material ?? job.material ?? 0, 10) || 0;
+
+  return {
+    id: job.id ?? `J-${Date.now()}`,
+    title: job.title ?? "",
+    type: job.type ?? "",
+    status: job.status ?? "open",
+    clientId: job.clientId ?? job.client_id ?? null,
+    clientName: job.clientName ?? job.client_name ?? "",
+    address: job.address ?? job.clientAddress ?? job.client_address ?? "",
+    desc: job.desc ?? "",
+    scheduledDate: job.scheduledDate ?? job.date ?? "",
+    assignee: job.assignee ?? job.engineer_id ?? null,
+    laborBudget,
+    materialBudget,
+    deposit_paid: Boolean(job.deposit_paid ?? job.depositPaid ?? false),
+    depositAmount: Number(job.depositAmount ?? job.deposit_amount ?? null) || null,
+    tailAmount: Number(job.tailAmount ?? job.tail_amount ?? null) || null,
+    created_at: job.created_at ?? job.createdAt ?? new Date().toISOString(),
+    techArrived: Boolean(job.techArrived ?? false),
+    techArrivedAt: job.techArrivedAt ?? null,
+    reportSubmittedAt: job.reportSubmittedAt ?? null,
+    paidAt: job.paidAt ?? null,
+    tail_paid: Boolean(job.tail_paid ?? false),
+    releasedTotal: Number(job.releasedTotal ?? null) || null,
+    materialSum: Number(job.materialSum ?? 0) || 0,
+    materials: Array.isArray(job.materials) ? job.materials : [],
+    messages: Array.isArray(job.messages) ? job.messages : [],
+    customItems: Array.isArray(job.customItems) ? job.customItems : [],
+    photos: Array.isArray(job.photos) ? job.photos : [],
+    signature: typeof job.signature === "string" ? job.signature : null,
+    
+  };
+};
+
+
+const formatCurrency = (n) => {
+  const v = Number(n) || 0;
+  return `${v.toLocaleString()}`;
+};
+
+const calcJobTotal = (job) => (Number(job?.laborBudget) || 0) + (Number(job?.materialBudget) || 0);
+const calcDeposit = (total) => Math.round((Number(total) || 0) * 0.3);
+const calcTail = (total) => (Number(total) || 0) - calcDeposit(total);
+
+const isProJob = (job) => calcJobTotal(job) >= 20000;
+
+// Deterministic pseudo distance for demo (no GPS required).
+const pseudoDistanceKm = (seed) => {
+  const s = String(seed || "");
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const km = (Math.abs(h) % 140 + 10) / 10; // 1.0 ~ 15.0
+  return km;
+};
+
+const mapsUrlForAddress = (address) => {
+  const q = encodeURIComponent(address || "");
+  return `https://www.google.com/maps/search/?api=1&query=${q}`;
+};
+// --- [2. Context & State] ---
+const AppContext = createContext();
+
+const AppProvider = ({ children }) => {
+  const [users, setUsers] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("cl_users_v101")) || DB_DEFAULTS.users;
+    } catch {
+      return DB_DEFAULTS.users;
+    }
+  });
+
+  const [jobs, setJobs] = useState(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("cl_jobs_v101")) || DB_DEFAULTS.jobs;
+      return raw.map(normalizeJob);
+    } catch {
+      return DB_DEFAULTS.jobs.map(normalizeJob);
+    }
+  });
+
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    localStorage.setItem("cl_users_v101", JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    localStorage.setItem("cl_jobs_v101", JSON.stringify(jobs.map(normalizeJob)));
+  }, [jobs]);
+  useEffect(() => {
+    if (!user) return;
+    const latest = users.find((u) => u.id === user.id);
+    if (latest && latest !== user) setUser(latest);
+  }, [users, user]);
+
+  const login = (email, password) => {
+    const u = users.find((u) => (u.email === email || u.name === email) && u.password === password);
+    if (u) {
+      setUser(u);
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => setUser(null);
+
+  const addJob = (jobData) => setJobs((prev) => [normalizeJob(jobData), ...prev]);
+  const updateJob = (updatedJob) => setJobs((prev) => prev.map((j) => (j.id === updatedJob.id ? normalizeJob(updatedJob) : j)));
+  const updateUser = (updatedUser) => {
+    setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+    setUser((prev) => (prev && prev.id === updatedUser.id ? updatedUser : prev));
+  };
+  const registerUser = (newUser) => {
+    setUsers((prev) => [...prev, newUser]);
+    setUser(newUser);
+  };
+
+  const resetData = () => {
+    localStorage.clear();
+    window.location.reload();
+  };
+
+  return <AppContext.Provider value={{ user, setUser, jobs, users, login, logout, addJob, updateJob, updateUser, registerUser, resetData, setJobs, setUsers }}>{children}</AppContext.Provider>;
+};
+
+const useApp = () => useContext(AppContext);
+
+// --- [3. UI Components] ---
+const ToastContext = createContext(null);
+
+const ToastProvider = ({ children }) => {
+  const [toasts, setToasts] = useState([]);
+
+  const addToast = (message, type = "info") => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
+  };
+
+  return (
+    <ToastContext.Provider value={{ addToast }}>
+      {children}
+      <div className="fixed top-6 right-6 z-[300] flex flex-col gap-3 pointer-events-none">
+        {toasts.map((t) => (
+          <div key={t.id} className="pointer-events-auto px-6 py-4 rounded-2xl shadow-xl bg-slate-900/90 text-white text-sm font-medium flex items-center gap-3 animate-enter backdrop-blur-md">
+            <Icon name={t.type === "success" ? "check-circle" : "alert-circle"} size={20} className={t.type === "success" ? "text-emerald-400" : "text-rose-400"} /> {t.message}
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+};
+
+const useToast = () => useContext(ToastContext);
+
+const ErrorBoundary = class extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading...</div>;
+    return this.props.children;
+  }
+};
+
+const StatusBadge = ({ status }) => {
+  const config = {
+    open: { bg: "bg-emerald-100", text: "text-emerald-700", label: "媒合中", icon: "zap" },
+    active: { bg: "bg-blue-100", text: "text-blue-700", label: "施工中", icon: "wrench" },
+    completed: { bg: "bg-purple-100", text: "text-purple-700", label: "待驗收", icon: "check-circle" },
+    closed: { bg: "bg-slate-100", text: "text-slate-600", label: "已結案", icon: "archive" },
+  };
+  const s = config[status] || config.open;
+  return (
+    <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${s.bg} ${s.text} flex items-center gap-1 w-fit`}>
+      <Icon name={s.icon} size={12} /> {s.label}
+    </span>
+  );
+};
+
+const SimpleBarChart = ({ data }) => {
+  const max = Math.max(...data, 1);
+  return (
+    <div className="flex items-end gap-3 h-32 mt-4 border-b border-slate-100 pb-2">
+      {data.map((val, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+          <div className="w-full bg-indigo-100 rounded-t-md relative overflow-hidden transition-all duration-500 group-hover:bg-indigo-200" style={{ height: `${(val / max) * 100}%` }}>
+            <div className="absolute bottom-0 w-full bg-indigo-500 h-1 opacity-80"></div>
+          </div>
+          <span className="text-[10px] text-slate-400 font-medium">W{i + 1}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+
+const SignaturePad = ({ value, onChange }) => {
+  const canvasRef = React.useRef(null);
+  const drawingRef = React.useRef(false);
+  const lastRef = React.useRef({ x: 0, y: 0 });
+
+  const resizeCanvas = React.useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+
+    const width = Math.max(1, Math.floor(rect.width * dpr));
+    const height = Math.max(1, Math.floor(rect.height * dpr));
+
+    const prev = canvas.toDataURL('image/png');
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    // white background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, rect.width, rect.height);
+
+    if (value) {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      };
+      img.src = value;
+    } else if (prev && prev !== 'data:,') {
+      // keep whatever was already drawn during resize
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      };
+      img.src = prev;
+    }
+  }, [value]);
+
+  useEffect(() => {
+    resizeCanvas();
+    const onResize = () => resizeCanvas();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [resizeCanvas]);
+
+  const getPoint = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  };
+
+  const start = (e) => {
+    e.preventDefault();
+    drawingRef.current = true;
+    lastRef.current = getPoint(e);
+  };
+
+  const move = (e) => {
+    if (!drawingRef.current) return;
+    e.preventDefault();
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    const p = getPoint(e);
+    const last = lastRef.current;
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 2.2;
+
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+
+    lastRef.current = p;
+  };
+
+  const end = () => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    const canvas = canvasRef.current;
+    const dataUrl = canvas.toDataURL('image/png');
+    onChange(dataUrl);
+  };
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, rect.width, rect.height);
+    onChange(null);
+  };
+
+  return (
+    <div className="bg-white p-4 rounded-xl border border-slate-200">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-bold text-slate-700 flex items-center gap-2"><Icon name="pen-tool" /> 客戶簽名</h4>
+        <button onClick={clear} className="text-xs font-bold text-slate-600 bg-slate-50 px-3 py-1.5 rounded-full hover:bg-slate-100">清除</button>
+      </div>
+      <div className="text-xs text-slate-400 mb-2">請客戶於下方簽名確認完成交付</div>
+      <div className="rounded-xl overflow-hidden border border-slate-200">
+        <canvas
+          ref={canvasRef}
+          className="w-full h-40"
+          onMouseDown={start}
+          onMouseMove={move}
+          onMouseUp={end}
+          onMouseLeave={end}
+          onTouchStart={start}
+          onTouchMove={move}
+          onTouchEnd={end}
+        />
+      </div>
+    </div>
+  );
+};const HELP_TEXT = `
+☁️ CloudLink 雲程智慧工務 SaaS 系統 - 操作說明書 (v101)
+
+本系統專為弱電、資訊、網路與安防工程設計，旨在實現「發案標準化」、「施工流程防呆化」與「帳務透明化」。系統分為三大權限角色：企業客戶、專業技師 與 總部管理員。
+
+壹、 系統登入與註冊
+
+進入系統：開啟系統首頁，會看到「我是客戶」、「我是技師」、「後台管理」三個主要入口。
+
+快速測試通道：在登入頁面下方，設有「客戶」、「技師」、「管理員」三個快捷按鈕，點擊即可自動帶入測試帳號與密碼，點擊「登入」即可快速進入對應介面。（測試密碼預設均為 123）
+
+帳號註冊：
+
+客戶與技師可切換至「註冊帳號」分頁填寫資料。
+
+為了系統風控，後台管理員不開放外部註冊。
+
+貳、 企業客戶端 (Client Portal)
+
+核心價值：解決客戶不知如何精準描述需求、不了解市場行情的痛點，並保障資金安全。
+
+1. 發布新工程需求 (AI 輔助)
+
+點擊首頁 [+ 發布新需求] 按鈕。
+
+步驟一：分類與描述
+
+選擇工程類別（如：網路工程、監視器、門禁系統）。
+
+填寫案件標題、預約時間與詳細施工地址。
+
+在需求描述框內清楚寫下現場狀況。
+
+步驟二：AI 智慧估價與預算設定
+
+若不清楚行情，可點擊 [✨ AI 估價]，系統會自動帶入建議的「工資」與「材料」預算基準。
+
+客戶可自行微調工資與材料費，系統會自動加總「總預算」。
+
+步驟三：支付訂金
+
+確認金額無誤後，點擊 [支付訂金 (30%) 並發布]。系統採第三方託管機制，保障雙方權益。發布後案件會進入「媒合中」狀態。
+
+2. 案件追蹤與驗收
+
+狀態追蹤：首頁清單會即時顯示案件狀態（媒合中、施工中、待驗收、已結案）。
+
+與師傅互動：當師傅接案後，點擊案件卡片可查看師傅履歷（包含評分、年資、擅長技能）。並可使用 [通話] 或 [訊息] 功能與師傅直接聯繫。
+
+驗收付款：師傅完工後，案件狀態會變更為「待驗收」。點擊 [驗收付款] 即可結清尾款，案件正式結案。
+
+參、 專業技師端 (Engineer Portal)
+
+核心價值：強制規範施工 SOP，確保現場證據保全，並內建常用材料庫加速請款流程。
+
+1. 接案大廳與搶單
+
+首頁預設為 [接案大廳]，顯示所有待媒合的案件（包含距離與預算）。
+
+帶有 PRO 標籤的為高預算優質案件。
+
+點擊案件查看詳情，確認可承接後，點擊底部 [立即接案]，案件將移至 [我的任務]。
+
+2. 施工 SOP 流程 (強制防呆)
+
+進入 [我的任務] 點擊進行中的案件，必須依序執行以下步驟：
+
+導航與聯繫：使用 [導航] 打開地圖前往，或使用 [通話/訊息] 聯繫客戶。
+
+📍 抵達打卡：到場後，必須先點擊 [抵達現場打卡] 記錄時間與 GPS，才能解鎖後續完工回報表單。
+
+📦 耗材紀錄 (Smart BOM)：
+
+點擊 [+ 常用庫]，可直接勾選弱電常用材料（如 Cat.6 網路線、IPCam、RJ45 水晶頭等），系統自動帶入單價。
+
+點擊 + 或 - 調整使用數量，系統自動計算材料總價。
+
+📷 完工照片：點擊相機圖示，強制要求上傳施工照片以供驗收備查。
+
+✍️ 客戶簽名：將設備交給客戶，於螢幕上的「簽名板」進行電子簽名確認。
+
+送出報告：以上資訊填寫完畢，點擊 [送出報告]，等待客戶線上支付尾款。
+
+3. 錢包與提領
+
+點擊右上角 [💰 錢包] 圖示。
+
+顯示目前可提領的已結算收益，可選擇「標準提領」或「閃電提領」，點擊申請即可將款項匯出至綁定帳戶。
+
+肆、 總部管理端 (Admin Portal - God Mode)
+
+核心價值：掌控全域金流、人員狀況，並支援早夕會管理的每日報表。
+
+1. 戰情儀表板 (Overview)
+
+即時顯示全域核心指標：總營收、案件總數、活躍會員數。
+
+內建「營收趨勢圖」，視覺化呈現近期業績走勢。
+
+2. 每日營運日報 (早會/夕會必備)
+
+點擊左側選單下方的 [📄 生成日報]。
+
+系統將自動抓取「今日」的營運數據，產出數位報表，包含：
+
+今日新增案件數 / 今日完工案件數
+
+今日總營收額
+
+財務摘要：自動拆解「已收訂金 (30%)」與「待收尾款 (未結案)」，讓經營者精準掌握當日現金流與應收帳款。
+
+可直接截圖發佈至公司管理群組。
+
+3. 全域工單管理 (Jobs)
+
+列表顯示所有工單的 ID、標題、當前狀態與金額。
+
+點擊 [管理] 可強制編輯工單資料（例如處理客訴或手動更改狀態）。
+
+4. 會員管理 (Users)
+
+掌控平台所有客戶與技師的資料。
+
+顯示會員的認證狀態（如：已認證、正常、待審核）。
+
+可點擊 [編輯] 修改會員名稱或進行停權等操作。
+`;
+
+const HelpModal = ({ onClose, onDiagnostics }) => {
+  return (
+    <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
+      <div className="bg-white w-full max-w-3xl md:rounded-3xl rounded-t-3xl h-[92vh] md:h-[85vh] shadow-2xl overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <Icon name="help-circle" size={22} />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg text-slate-900">操作說明</h3>
+              <p className="text-xs text-slate-400">CloudLink v101</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100">
+            <Icon name="x" />
+          </button>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1">
+          <pre className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{HELP_TEXT}</pre>
+          </div>
+
+        <div className="p-6 border-t border-slate-100 bg-white">
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={onDiagnostics} className="w-full btn btn-outline">系統自檢</button>
+            <button onClick={onClose} className="w-full btn btn-primary">關閉</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+const DiagnosticsModal = ({ onClose }) => {
+  const { user, users, jobs, setJobs, setUsers } = useApp();
+  const [testResults, setTestResults] = useState(null);
+  const [isRunningTests, setIsRunningTests] = useState(false);
+
+  const runAutoTests = () => {
+    setIsRunningTests(true);
+    try {
+      const results = [];
+
+      const sampleClient = users.find((u) => String(u.role || "").startsWith("client")) || null;
+      const sampleEng = users.find((u) => u.role === "engineer") || null;
+
+      results.push({
+        name: "樣本會員存在 (客戶/技師)",
+        ok: Boolean(sampleClient) && Boolean(sampleEng),
+        detail: `client=${sampleClient?.id || "none"}, engineer=${sampleEng?.id || "none"}`,
+      });
+
+      const sampleJob = normalizeJob({
+        id: `T-${Date.now()}`,
+        title: "自動測試工單",
+        status: "open",
+        clientId: sampleClient?.id || "client1",
+        assignee: sampleEng?.id || "tech1",
+        address: "台南市善化區南科三路100號",
+        desc: "auto-test",
+        laborBudget: 3000,
+        materialBudget: 2000,
+        messages: [],
+      });
+
+      const total = calcJobTotal(sampleJob);
+      const dep = calcDeposit(total);
+      const tail = calcTail(total);
+
+      results.push({
+        name: "金額拆分 (30/70)",
+        ok: dep + tail === total,
+        detail: `${formatCurrency(dep)} + ${formatCurrency(tail)} = ${formatCurrency(total)}`,
+      });
+
+      const jobWithMedia = normalizeJob({
+        ...sampleJob,
+        photos: ["data:image/png;base64,AAA"],
+        signature: "data:image/png;base64,BBB",
+      });
+
+      results.push({
+        name: "完工證據持久化 (照片/簽名)",
+        ok: Array.isArray(jobWithMedia.photos) && jobWithMedia.photos.length === 1 && Boolean(jobWithMedia.signature),
+        detail: `photos=${jobWithMedia.photos.length}, signature=${jobWithMedia.signature ? "yes" : "no"}`,
+      });
+
+      const jobWithMsg = normalizeJob({
+        ...sampleJob,
+        messages: [{ id: "M-1", fromId: "x", fromName: "x", text: "hi", ts: new Date().toISOString() }],
+      });
+
+      results.push({
+        name: "訊息持久化 (messages)",
+        ok: Array.isArray(jobWithMsg.messages) && jobWithMsg.messages.length === 1 && jobWithMsg.messages[0].text === "hi",
+        detail: `messages=${jobWithMsg.messages.length}`,
+      });
+
+      const clientWallet = 10000;
+      const engWallet = 0;
+      const afterDeposit = clientWallet - dep;
+      const afterTail = afterDeposit - tail;
+      const engAfter = engWallet + total;
+
+      results.push({
+        name: "錢包流程 (訂金+尾款)",
+        ok: afterTail === clientWallet - total && engAfter === total,
+        detail: `client: ${formatCurrency(clientWallet)} -> ${formatCurrency(afterTail)}, eng: ${formatCurrency(engWallet)} -> ${formatCurrency(engAfter)}`,
+      });
+
+      setTestResults(results);
+    } finally {
+      setIsRunningTests(false);
+    }
+  };
+
+  const issues = [];
+  const validStatus = new Set(["open", "active", "completed", "closed"]);
+
+  if (!window.localStorage) issues.push("localStorage 不可用，資料將無法保存");
+
+  users.forEach((u) => {
+    if (!u.id) issues.push("有會員缺少 id");
+    if (u.wallet !== undefined && Number.isNaN(Number(u.wallet))) issues.push(`會員錢包金額異常: ${u.name}`);
+  });
+
+  jobs.forEach((j) => {
+    if (!j.id) issues.push("有工單缺少 id");
+    if (!j.title) issues.push(`工單缺少標題: ${j.id}`);
+    if (!validStatus.has(j.status)) issues.push(`工單狀態不合法: ${j.id} (${j.status})`);
+    if (!j.clientId) issues.push(`工單缺少 clientId: ${j.id}`);
+
+    const total = calcJobTotal(j);
+    if (total <= 0) issues.push(`工單預算為 0: ${j.id}`);
+
+    if (j.status === "completed") {
+      if (!Array.isArray(j.photos) || j.photos.length === 0) issues.push(`已完工但缺少照片: ${j.id}`);
+      if (!j.signature) issues.push(`已完工但缺少簽名: ${j.id}`);
+    }
+  });
+
+  const fixData = () => {
+    setUsers((prev) => prev.map((u) => ({ ...u, wallet: Number(u.wallet) || 0 })));
+    setJobs((prev) => prev.map((j) => normalizeJob(j)));
+  };
+
+  return (
+    <div className="fixed inset-0 z-[210] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
+      <div className="bg-white w-full max-w-2xl md:rounded-3xl rounded-t-3xl h-[80vh] md:h-[75vh] shadow-2xl overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center">
+              <Icon name="bug" size={22} />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg text-slate-900">系統自檢</h3>
+              <p className="text-xs text-slate-400">{user ? `目前登入: ${user.name}` : "尚未登入"} | users: {users.length} | jobs: {jobs.length}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1">
+          {issues.length === 0 ? (
+            <div className="p-4 rounded-2xl bg-emerald-50 text-emerald-700 font-bold">未發現明顯資料或流程問題</div>
+          ) : (
+            <div className="space-y-2">
+              {issues.map((t, i) => (
+                <div key={i} className="p-3 rounded-xl bg-rose-50 text-rose-700 text-sm font-medium">{t}</div>
+              ))}
+            </div>
+          )}
+
+          {testResults ? (
+            <div className="mt-6 space-y-2">
+              <h4 className="text-sm font-bold text-slate-700">自動流程測試結果 (不修改資料)</h4>
+              {testResults.map((r, i) => (
+                <div key={i} className={`p-3 rounded-xl text-sm font-medium ${r.ok ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                  <div className="flex items-center justify-between">
+                    <span>{r.name}</span>
+                    <span className="font-num">{r.ok ? "PASS" : "FAIL"}</span>
+                  </div>
+                  {r.detail && (
+                    <div className={`text-xs mt-1 ${r.ok ? "text-emerald-700/80" : "text-rose-700/80"}`}>{r.detail}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-6 text-xs text-slate-400">可按下下方「執行自動測試」做主要流程邏輯驗證 (不會修改你的資料)。</div>
+          )}
+
+        </div>
+        <div className="p-6 border-t border-slate-100 bg-white">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <button onClick={runAutoTests} className={`w-full btn btn-outline ${isRunningTests ? "opacity-50 pointer-events-none" : ""}`}>{isRunningTests ? "測試中..." : "執行自動測試"}</button>
+            <button onClick={fixData} className="w-full btn btn-outline">嘗試修復資料</button>
+            <button onClick={onClose} className="w-full btn btn-primary">關閉</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- [Modules: Auth & Registration] ---
+const AuthScreen = () => {
+  const { login, registerUser, resetData } = useApp();
+  const [view, setView] = useState("landing");
+  const [role, setRole] = useState("");
+  const [form, setForm] = useState({ name: "", email: "", password: "", phone: "" });
+  const { addToast } = useToast();
+
+  const handleRegister = () => {
+    if (!form.email || !form.password || !form.name) return addToast("請填寫完整資訊", "error");
+
+    const newUser = {
+      id: `U-${Date.now()}`,
+      role: role,
+      email: form.email,
+      password: form.password,
+      name: form.name,
+      phone: form.phone,
+      status: role === "engineer" ? "pending" : "active",
+      avatar: form.name ? form.name[0] : "U",
+      wallet: role.startsWith("client") ? 100000 : 0,
+      ...(role === "client_business" ? { company: form.company || "", taxId: form.taxId || "" } : {}),
+      ...(role === "engineer" ? { skills: [], rating: 5.0, jobs: 0 } : {}),
+    };
+
+    registerUser(newUser);
+    addToast("註冊成功！", "success");
+  };
+
+  const handleLogin = () => {
+    const success = login(form.email, form.password);
+    if (!success) addToast("帳號或密碼錯誤", "error");
+    else addToast("登入成功", "success");
+  };
+
+  const quickLogin = (type) => {
+    if (type === "client") login("client", "123");
+    if (type === "tech") login("tech", "123");
+    if (type === "admin") login("admin", "123");
+  };
+
+  if (view === "landing")
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="text-center mb-10 animate-enter">
+          <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-indigo-200 mx-auto mb-6">
+            <Icon name="cloud-lightning" size={40} />
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">雲程數位科技有限公司</h1>
+          <p className="text-slate-500 tracking-wide">智慧工務 • 專業媒合</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl animate-enter" style={{ animationDelay: "0.1s" }}>
+          <button onClick={() => { setRole("client_personal"); setView("login"); }} className="card-modern p-6 flex items-center gap-4 hover:border-indigo-400 group text-left">
+            <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl group-hover:scale-110 transition-transform"><Icon name="user" /></div>
+            <div><h3 className="font-bold text-lg">一般客戶</h3><p className="text-xs text-slate-400">居家修繕、個人需求</p></div>
+          </button>
+          <button onClick={() => { setRole("client_business"); setView("login"); }} className="card-modern p-6 flex items-center gap-4 hover:border-indigo-400 group text-left">
+            <div className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:scale-110 transition-transform"><Icon name="building-2" /></div>
+            <div><h3 className="font-bold text-lg">企業用戶</h3><p className="text-xs text-slate-400">公司統編、月結服務</p></div>
+          </button>
+          <button onClick={() => { setRole("engineer"); setView("login"); }} className="card-modern p-6 flex items-center gap-4 hover:border-indigo-400 group text-left">
+            <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:scale-110 transition-transform"><Icon name="wrench" /></div>
+            <div><h3 className="font-bold text-lg">工程師 / 技師</h3><p className="text-xs text-slate-400">接案媒合、完工回報</p></div>
+          </button>
+          <button onClick={() => { setRole("admin"); setView("login"); }} className="card-modern p-6 flex items-center gap-4 hover:border-indigo-400 group text-left border-dashed">
+            <div className="p-4 bg-slate-100 text-slate-600 rounded-2xl group-hover:scale-110 transition-transform"><Icon name="shield" /></div>
+            <div><h3 className="font-bold text-lg">後台管理</h3><p className="text-xs text-slate-400">營運端專用</p></div>
+          </button>
+        </div>
+      </div>
+    );
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="bg-white w-full max-w-md rounded-2xl p-8 shadow-2xl animate-enter relative">
+        <button onClick={() => setView("landing")} className="absolute top-6 left-6 text-slate-400 hover:text-slate-600"><Icon name="arrow-left" /></button>
+        <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">{view === "login" ? "登入" : "註冊帳號"}</h2>
+
+        <div className="space-y-4">
+          {view === "register" && (
+            <>
+              <input className="input-modern" placeholder="真實姓名" onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <input className="input-modern" placeholder="聯絡電話" onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              {role === "client_business" && <input className="input-modern" placeholder="公司名稱" onChange={(e) => setForm({ ...form, company: e.target.value })} />}
+              {role === "client_business" && <input className="input-modern" placeholder="統一編號" onChange={(e) => setForm({ ...form, taxId: e.target.value })} />}
+              {role === "engineer" && <div className="text-xs text-orange-500 bg-orange-50 p-2 rounded">註冊後需等待後台審核身分文件</div>}
+            </>
+          )}
+
+          <input className="input-modern" placeholder="Email / 帳號" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <input className="input-modern" type="password" placeholder="密碼" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+
+          <button onClick={() => (view === "login" ? handleLogin() : handleRegister())} className="w-full btn btn-primary px-4 py-3 rounded-xl font-bold shadow-lg">
+            {view === "login" ? "登入" : "提交註冊"}
+          </button>
+        </div>
+
+        {role !== "admin" && (
+          <div className="mt-6 text-center">
+            <button onClick={() => setView(view === "login" ? "register" : "login")} className="text-sm font-bold text-indigo-600 hover:underline">
+              {view === "login" ? "還沒有帳號？立即註冊" : "已有帳號？返回登入"}
+            </button>
+          </div>
+        )}
+
+        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+          <p className="text-xs text-slate-400 mb-2">快速測試通道 (點擊登入)</p>
+          <div className="flex justify-center gap-2">
+            <button onClick={() => quickLogin("client")} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold hover:bg-blue-100">客戶</button>
+            <button onClick={() => quickLogin("tech")} className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold hover:bg-emerald-100">技師</button>
+            <button onClick={() => quickLogin("admin")} className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold hover:bg-slate-200">管理員</button>
+          </div>
+          <button onClick={resetData} className="mt-4 text-xs text-red-300 underline">重置資料</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- [Modules: Client] ---
+const ClientCreateJob = ({ onClose }) => {
+  const { user, addJob, updateUser } = useApp();
+  const [form, setForm] = useState({
+    title: "",
+    type: "",
+    address: user?.address || "",
+    desc: "",
+    labor: "",
+    material: "",
+    date: "",
+    items: {},
+    customItems: [],
+  });
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  const { addToast } = useToast();
+
+  const currentSubItems = useMemo(() => {
+    const category = PROJECT_CATEGORIES.find((c) => c.label === form.type);
+    return category ? category.subItems : [];
+  }, [form.type]);
+
+  useEffect(() => {
+    let laborTotal = 0;
+    let materialTotal = 0;
+    const descParts = [];
+
+    const subById = new Map((currentSubItems || []).map((i) => [i.id, i]));
+
+    Object.entries(form.items || {}).forEach(([id, qtyRaw]) => {
+      const qty = Number(qtyRaw) || 0;
+      if (qty <= 0) return;
+      const item = subById.get(id);
+      if (!item) return;
+      materialTotal += (Number(item.price) || 0) * qty;
+      laborTotal += (Number(item.labor) || 0) * qty;
+      descParts.push(`${item.name} x${qty}`);
+    });
+
+    (form.customItems || []).forEach((ci) => {
+      const name = String(ci.name || "").trim();
+      const qty = Number(ci.qty) || 0;
+      if (!name || qty <= 0) return;
+      const mat = Number(ci.material) || 0;
+      const lab = Number(ci.labor) || 0;
+      materialTotal += mat * qty;
+      laborTotal += lab * qty;
+      descParts.push(`${name} x${qty}`);
+    });
+
+    if (descParts.length === 0) return;
+
+    if (laborTotal > 0 || materialTotal > 0) {
+      setForm((prev) => ({
+        ...prev,
+        labor: laborTotal,
+        material: materialTotal,
+        desc: descParts.join(", "),
+      }));
+    }
+  }, [form.items, form.customItems, currentSubItems]);
+
+  const handleItemChange = (id, delta) => {
+    setForm((prev) => {
+      const currentQty = prev.items[id] || 0;
+      const newQty = Math.max(0, currentQty + delta);
+      return { ...prev, items: { ...prev.items, [id]: newQty } };
+    });
+  };
+
+  const addCustomItem = () => {
+    const id = `CI-${Date.now()}`;
+    setForm((prev) => ({
+      ...prev,
+      customItems: [
+        ...(prev.customItems || []),
+        { id, name: "", unit: "式", qty: 1, material: 0, labor: 0 },
+      ],
+    }));
+  };
+
+  const updateCustomItem = (idx, patch) => {
+    setForm((prev) => ({
+      ...prev,
+      customItems: (prev.customItems || []).map((x, i) => (i === idx ? { ...x, ...patch } : x)),
+    }));
+  };
+
+  const removeCustomItem = (idx) => {
+    setForm((prev) => ({
+      ...prev,
+      customItems: (prev.customItems || []).filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handleSubmit = () => {
+    if (!form.title || !form.type || !form.address) {
+      addToast("請填寫完整資訊", "error");
+      return;
+    }
+
+    const labor = Number.parseInt(form.labor, 10) || 0;
+    const material = Number.parseInt(form.material, 10) || 0;
+    const total = labor + material;
+
+    if (total <= 0) {
+      addToast("請設定預算金額", "error");
+      return;
+    }
+
+    const deposit = calcDeposit(total);
+    const tail = total - deposit;
+
+    const wallet = Number(user.wallet) || 0;
+    if (wallet < deposit) {
+      addToast(`錢包餘額不足，訂金需要 ${formatCurrency(deposit)}`, "error");
+      return;
+    }
+
+    updateUser({ ...user, wallet: wallet - deposit });
+
+    addJob({
+      id: `J-${Date.now()}`,
+      title: form.title,
+      type: form.type,
+      address: form.address,
+      desc: form.desc,
+      scheduledDate: form.date,
+      status: "open",
+      clientId: user.id,
+      clientName: user.name,
+      laborBudget: labor,
+      materialBudget: material,
+      deposit_paid: true,
+      depositAmount: deposit,
+      tailAmount: tail,
+      created_at: new Date().toISOString(),
+      customItems: form.customItems || [],
+      materials: [],
+      photos: [],
+      signature: null,
+    });
+
+    addToast(`訂金已支付 ${formatCurrency(deposit)}，已成功發案`, "success");
+    onClose();
+  };
+
+  const handleAi = () => {
+    setIsAiLoading(true);
+    setTimeout(() => {
+      setForm((p) => ({ ...p, labor: 3000, material: 2000 }));
+      setIsAiLoading(false);
+    }, 800);
+  };
+
+  const total = (Number.parseInt(form.labor, 10) || 0) + (Number.parseInt(form.material, 10) || 0);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4 animate-enter">
+      <div className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+
+        <div className="p-6 border-b border-slate-50 flex justify-between items-center">
+          <h3 className="font-bold text-xl text-slate-800">發布需求</h3>
+          <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+        </div>
+
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-2 block">工程類別</label>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {PROJECT_CATEGORIES.map((cat) => (
+                <button key={cat.id} onClick={() => setForm({ ...form, type: cat.label, items: {} })} className={`category-btn ${form.type === cat.label ? "active" : "inactive"}`}>
+                  <Icon name={cat.icon} size={24} className="mb-1" /> <span className="text-[10px] font-bold">{cat.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {currentSubItems.length > 0 && (
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 animate-slide-down">
+                <label className="text-xs font-bold text-slate-500 mb-2 block">選擇細項 (自動計算)</label>
+                <div className="space-y-2">
+                  {currentSubItems.map((item) => (
+                    <div key={item.id} className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-100">
+                      <div>
+                        <div className="text-sm font-bold text-slate-700">{item.name}</div>
+                        <div className="text-xs text-slate-400">${item.price + item.labor} / {item.unit}</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => handleItemChange(item.id, -1)} className="w-6 h-6 rounded-full bg-slate-100">-</button>
+                        <span className="w-4 text-center font-bold text-sm">{form.items[item.id] || 0}</span>
+                        <button onClick={() => handleItemChange(item.id, 1)} className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600">+</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold text-slate-500 block">自訂常用項目 (可選)</label>
+                <button onClick={addCustomItem} className="text-xs font-bold text-slate-700 bg-white px-3 py-1.5 rounded-full shadow-sm border border-slate-200 hover:bg-slate-50">+ 新增</button>
+              </div>
+              {(!form.customItems || form.customItems.length === 0) && <div className="text-sm text-slate-400">如果選單沒有符合的細項，可在這裡自行新增項目。</div>}
+              <div className="space-y-2 mt-3">
+                {(form.customItems || []).map((ci, idx) => {
+                  const qty = Number(ci.qty) || 0;
+                  const lineTotal = ((Number(ci.material) || 0) + (Number(ci.labor) || 0)) * qty;
+                  return (
+                    <div key={ci.id || idx} className="bg-white p-3 rounded-2xl border border-slate-100 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input className="input-modern py-2 flex-1" placeholder="項目名稱" value={ci.name} onChange={(e) => updateCustomItem(idx, { name: e.target.value })} />
+                        <button onClick={() => removeCustomItem(idx)} className="px-3 py-2 rounded-xl bg-rose-50 text-rose-600 font-bold text-xs hover:bg-rose-100 border border-rose-100">刪除</button>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        <input className="input-modern py-2" placeholder="單位" value={ci.unit} onChange={(e) => updateCustomItem(idx, { unit: e.target.value })} />
+                        <input type="number" className="input-modern py-2 text-right font-num" placeholder="數量" value={ci.qty} onChange={(e) => updateCustomItem(idx, { qty: Number(e.target.value) })} />
+                        <input type="number" className="input-modern py-2 text-right font-num" placeholder="材料/單位" value={ci.material} onChange={(e) => updateCustomItem(idx, { material: Number(e.target.value) })} />
+                        <input type="number" className="input-modern py-2 text-right font-num" placeholder="工資/單位" value={ci.labor} onChange={(e) => updateCustomItem(idx, { labor: Number(e.target.value) })} />
+                      </div>
+                      <div className="text-xs text-slate-400 text-right">小計: {formatCurrency(lineTotal)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-2 border-t border-slate-100">
+            <input className="input-modern" placeholder="案件標題" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <input className="input-modern" placeholder="施工地址" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            <div className="flex gap-3"><input type="datetime-local" className="input-modern" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
+            <textarea className="input-modern h-24 resize-none" placeholder="描述..." value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} />
+          </div>
+
+          <div className="bg-indigo-50 p-5 rounded-3xl">
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="font-bold text-indigo-900">預算設定</h4>
+              {(!currentSubItems || currentSubItems.length === 0) && (
+                <button onClick={handleAi} className="text-xs bg-white text-indigo-600 px-3 py-1.5 rounded-full font-bold shadow-sm flex items-center gap-1">
+                  {isAiLoading ? <Icon name="loader-2" className="animate-spin" size={12} /> : <Icon name="sparkles" size={12} />} AI 估價
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <input type="number" className="w-full p-2 rounded-lg text-right font-mono font-num" placeholder="工資" value={form.labor} onChange={(e) => setForm({ ...form, labor: e.target.value })} />
+              <input type="number" className="w-full p-2 rounded-lg text-right font-mono font-num" placeholder="材料" value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })} />
+            </div>
+            <div className="mt-3 text-right text-indigo-900 font-bold text-lg font-num">總計: ${total.toLocaleString()}</div>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-slate-50">
+          <button onClick={handleSubmit} className="w-full btn btn-primary shadow-xl shadow-indigo-200">支付訂金 (30%) 並發布</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+const CallModal = ({ name, phone, onClose, addToast }) => {
+  const clean = String(phone || "");
+  const tel = `tel:${clean.replace(/[^0-9+]/g, "")}`;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(clean);
+      addToast("已複製電話", "success");
+    } catch {
+      // Fallback for non-secure contexts (file://)
+      window.prompt("複製電話", clean);
+    }
+  };
+
+  const dial = () => {
+    if (!clean) {
+      addToast("對方未提供電話", "error");
+      return;
+    }
+    window.location.href = tel;
+  };
+
+  return (
+    <div className="fixed inset-0 z-[170] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
+      <div className="bg-white w-full max-w-md md:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><Icon name="phone" size={20} /></div>
+            <div>
+              <h3 className="font-bold text-lg text-slate-900">通話</h3>
+              <p className="text-xs text-slate-400">{name || "對方"}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="card-modern p-5">
+            <div className="text-xs font-bold text-slate-400 uppercase mb-2">電話</div>
+            <div className="text-2xl font-bold text-slate-900 font-num">{clean || "未提供"}</div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={copy} className="btn btn-outline py-3 rounded-xl">複製</button>
+            <button onClick={dial} className="btn btn-primary py-3 rounded-xl">撥打</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ChatModal = ({ job, me, peer, onUpdate, onClose }) => {
+  const [draft, setDraft] = useState("");
+  const listRef = React.useRef(null);
+
+  const messages = Array.isArray(job.messages) ? job.messages : [];
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages.length]);
+
+  const send = () => {
+    const text = draft.trim();
+    if (!text) return;
+
+    const msg = {
+      id: `M-${Date.now()}`,
+      fromId: me.id,
+      fromName: me.name,
+      text,
+      ts: new Date().toISOString(),
+    };
+
+    onUpdate({ ...job, messages: [...messages, msg] });
+    setDraft("");
+  };
+
+  return (
+    <div className="fixed inset-0 z-[175] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
+      <div className="bg-white w-full max-w-2xl md:rounded-3xl rounded-t-3xl h-[85vh] md:h-[75vh] shadow-2xl overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center"><Icon name="message-square" size={20} /></div>
+            <div>
+              <h3 className="font-bold text-lg text-slate-900">訊息</h3>
+              <p className="text-xs text-slate-400">{peer?.name || "對方"} · {job.title}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+        </div>
+
+        <div ref={listRef} className="flex-1 overflow-y-auto p-6 space-y-3 bg-slate-50">
+          {messages.length === 0 && <div className="text-sm text-slate-400 text-center">尚無訊息，輸入內容開始對話。</div>}
+          {messages.map((m) => {
+            const mine = m.fromId === me.id;
+            return (
+              <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm ${mine ? "bg-indigo-600 text-white" : "bg-white text-slate-700"}`}>
+                  <div className={`text-[10px] mb-1 ${mine ? "text-indigo-100" : "text-slate-400"}`}>{mine ? "我" : (m.fromName || "對方")}</div>
+                  <div className="whitespace-pre-wrap leading-relaxed">{m.text}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="p-4 border-t bg-white">
+          <div className="flex gap-2">
+            <input className="input-modern flex-1" placeholder="輸入訊息..." value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} />
+            <button onClick={send} className="btn btn-primary px-5">送出</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ConversationsModal = ({ me, onClose, onOpen }) => {
+  const { jobs, users } = useApp();
+
+  const relevant = me?.role === "engineer"
+    ? jobs.filter((j) => j.assignee === me.id)
+    : jobs.filter((j) => j.clientId === me.id);
+
+  const rows = relevant
+    .map((j) => {
+      const peer = me?.role === "engineer"
+        ? users.find((u) => u.id === j.clientId)
+        : users.find((u) => u.id === j.assignee);
+      const msgs = Array.isArray(j.messages) ? j.messages : [];
+      const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+      const lastTs = last?.ts || j.created_at || "";
+      const preview = last?.text ? String(last.text).slice(0, 40) : "尚無訊息";
+      return { job: j, peer, lastTs, preview };
+    })
+    .filter((r) => Boolean(r.peer))
+    .sort((a, b) => String(b.lastTs).localeCompare(String(a.lastTs)));
+
+  return (
+    <div className="fixed inset-0 z-[176] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
+      <div className="bg-white w-full max-w-2xl md:rounded-3xl rounded-t-3xl h-[85vh] md:h-[75vh] shadow-2xl overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center"><Icon name="message-square" size={20} /></div>
+            <div>
+              <h3 className="font-bold text-lg text-slate-900">訊息</h3>
+              <p className="text-xs text-slate-400">快速開啟對話</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+        </div>
+
+        <div className="p-4 overflow-y-auto flex-1 bg-slate-50">
+          {rows.length === 0 ? (
+            <div className="p-6 text-center text-sm text-slate-400 bg-white border border-slate-200 rounded-2xl">
+              目前沒有可開啟的對話 (需要已媒合的案件)
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {rows.map((r) => (
+                <button
+                  key={r.job.id}
+                  onClick={() => onOpen(r.job)}
+                  className="w-full text-left card-modern p-4 hover:border-indigo-300"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-slate-900 truncate">{r.peer?.name || "對方"} · {r.job.title}</div>
+                      <div className="text-xs text-slate-500 mt-1 truncate">{r.preview}</div>
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-num shrink-0">{r.lastTs ? new Date(r.lastTs).toLocaleString() : ""}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 border-t border-slate-100 bg-white">
+          <button onClick={onClose} className="w-full btn btn-outline">關閉</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ProjectDetail = ({ job, user, onClose, onUpdate, addToast }) => {
+  const isEng = user.role === "engineer";
+  const { users, updateUser } = useApp();
+
+  const techInfo = users.find((u) => u.id === job.assignee);
+
+  
+  const peerUser = isEng ? users.find((u) => u.id === job.clientId) : users.find((u) => u.id === job.assignee);
+  const peerPhone = peerUser?.phone || "";
+
+  const [showChat, setShowChat] = useState(false);
+  const [showCall, setShowCall] = useState(false);
+const total = calcJobTotal(job);
+  const deposit = Number(job.depositAmount) || calcDeposit(total);
+  const tail = Number(job.tailAmount) || (total - deposit);
+
+  const [materials, setMaterials] = useState(job.materials || []);
+  const [photos, setPhotos] = useState(job.photos || []);
+  const [signature, setSignature] = useState(job.signature || null);
+  const [showBOM, setShowBOM] = useState(false);
+
+  const [showCustomMat, setShowCustomMat] = useState(false);
+  const [customMat, setCustomMat] = useState({ name: "", unit: "式", price: "", qty: 1 });
+  const openMaps = () => {
+    if (!job.address) return;
+    const w = window.open(mapsUrlForAddress(job.address), "_blank", "noopener,noreferrer");
+    if (!w) addToast("瀏覽器阻擋了彈出視窗，請允許後再試一次", "error");
+  };
+
+  const handleAction = (action) => {
+    if (action === "take") {
+      onUpdate({ ...job, status: "active", assignee: user.id });
+      addToast("接案成功", "success");
+    }
+
+    if (action === "arrive") {
+      onUpdate({ ...job, techArrived: true, techArrivedAt: new Date().toISOString() });
+      addToast("抵達打卡成功", "success");
+    }
+
+    if (action === "pay") {
+      const client = users.find((u) => u.id === job.clientId);
+      const tech = users.find((u) => u.id === job.assignee);
+
+      if (!client) {
+        addToast("找不到客戶資料", "error");
+        return;
+      }
+      if (!tech) {
+        addToast("找不到技師資料", "error");
+        return;
+      }
+
+      const clientWallet = Number(client.wallet) || 0;
+      if (clientWallet < tail) {
+        addToast(`錢包餘額不足，尾款需要 ${formatCurrency(tail)}`, "error");
+        return;
+      }
+
+      updateUser({ ...client, wallet: clientWallet - tail });
+      updateUser({ ...tech, wallet: (Number(tech.wallet) || 0) + total });
+
+      onUpdate({ ...job, status: "closed", paidAt: new Date().toISOString(), tail_paid: true, releasedTotal: total });
+      addToast("驗收付款完成，案件結案", "success");
+      onClose();
+    }
+  };
+
+  const updateMatQty = (idx, delta) => {
+    setMaterials((prev) =>
+      prev
+        .map((m, i) => {
+          if (i !== idx) return m;
+          const nextQty = Math.max(0, (Number(m.qty) || 0) + delta);
+          return { ...m, qty: nextQty };
+        })
+        .filter((m) => (Number(m.qty) || 0) > 0)
+    );
+  };
+
+  const updateMatPrice = (idx, nextPrice) => {
+    const price = Number(nextPrice) || 0;
+    setMaterials((prev) => prev.map((m, i) => (i === idx ? { ...m, price } : m)));
+  };
+
+  const addMat = (m) => {
+    setMaterials((prev) => {
+      const idx = prev.findIndex((x) => x.id === m.id);
+      if (idx >= 0) {
+        return prev.map((x, i) => (i === idx ? { ...x, qty: (Number(x.qty) || 1) + 1 } : x));
+      }
+      return [...prev, { ...m, qty: 1 }];
+    });
+    setShowBOM(false);
+  };
+
+  const addCustomMat = () => {
+    const name = String(customMat.name || "").trim();
+    const unit = String(customMat.unit || "").trim() || "式";
+    const price = Number(customMat.price) || 0;
+    const qty = Math.max(1, Number(customMat.qty) || 1);
+
+    if (!name) {
+      addToast("請輸入耗材名稱", "error");
+      return;
+    }
+    if (price <= 0) {
+      addToast("請輸入正確單價", "error");
+      return;
+    }
+
+    setMaterials((prev) => [...prev, { id: `CM-${Date.now()}`, name, unit, price, qty }]);
+    setCustomMat({ name: "", unit: "式", price: "", qty: 1 });
+    setShowCustomMat(false);
+  };
+
+  const handlePhoto = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    files.forEach((file) => {
+      const r = new FileReader();
+      r.onload = (v) => setPhotos((prev) => [...prev, v.target.result]);
+      r.readAsDataURL(file);
+    });
+  };
+
+  const removePhoto = (idx) => {
+    setPhotos((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const materialSum = materials.reduce((acc, m) => acc + (Number(m.price) || 0) * (Number(m.qty) || 0), 0);
+
+  const submit = () => {
+    if (!job.techArrived) {
+      addToast("請先抵達打卡，再送出報告", "error");
+      return;
+    }
+    if (photos.length === 0) {
+      addToast("請至少上傳 1 張完工照片", "error");
+      return;
+    }
+    if (!signature) {
+      addToast("請先完成客戶簽名", "error");
+      return;
+    }
+
+    onUpdate({
+      ...job,
+      status: "completed",
+      materials,
+      photos,
+      signature,
+      reportSubmittedAt: new Date().toISOString(),
+      materialSum,
+    });
+    addToast("報告送出，等待客戶驗收", "success");
+    onClose();
+  };
+
+  const canSubmit = Boolean(job.techArrived) && photos.length > 0 && Boolean(signature);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
+      <div className="bg-white w-full max-w-2xl md:rounded-3xl rounded-t-3xl h-[95vh] md:h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+
+        {showCall && <CallModal name={peerUser?.name} phone={peerPhone} addToast={addToast} onClose={() => setShowCall(false)} />}
+        {showChat && <ChatModal job={job} me={user} peer={peerUser} onUpdate={onUpdate} onClose={() => setShowChat(false)} />}
+
+
+        <div className="p-6 bg-white border-b border-slate-50 flex justify-between items-center">
+          <div>
+            <span className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded text-xs font-bold">{job.status}</span>
+            <h2 className="text-xl font-bold mt-1">{job.title}</h2>
+          </div>
+          <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100 text-slate-500"><Icon name="x" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 pb-32 space-y-6">
+          {(job.assignee || user.role.startsWith("client")) && (
+            <div className="grid grid-cols-3 gap-3">
+              <button
+                onClick={() => (peerUser ? setShowCall(true) : addToast("尚未媒合技師，暫無法通話", "error"))}
+                className={`p-4 bg-indigo-50 text-indigo-700 rounded-2xl font-bold flex flex-col items-center gap-2 hover:bg-indigo-100 ${
+                  !peerUser ? "opacity-50 pointer-events-none" : ""
+                }`}
+              >
+                <Icon name="phone" /> 通話
+              </button>
+              <button
+                onClick={() => (peerUser ? setShowChat(true) : addToast("尚未媒合技師，暫無法訊息", "error"))}
+                className={`p-4 bg-slate-50 text-slate-700 rounded-2xl font-bold flex flex-col items-center gap-2 hover:bg-slate-100 ${
+                  !peerUser ? "opacity-50 pointer-events-none" : ""
+                }`}
+              >
+                <Icon name="message-square" /> 訊息
+              </button>
+              <button onClick={openMaps} className="p-4 bg-emerald-50 text-emerald-700 rounded-2xl font-bold flex flex-col items-center gap-2 hover:bg-emerald-100"><Icon name="navigation" /> 導航</button>
+            </div>
+          )}
+
+          <div className="bg-white border border-slate-100 p-5 rounded-2xl space-y-3 shadow-sm">
+            <div className="flex gap-3 text-sm text-slate-600"><Icon name="map-pin" size={18} /> {job.address}</div>
+            <div className="flex gap-3 text-sm text-slate-600"><Icon name="file-text" size={18} /> {job.desc}</div>
+
+            <div className="border-t pt-3 space-y-2">
+              <div className="flex justify-between font-bold text-lg font-num"><span>預算總額</span><span>{formatCurrency(total)}</span></div>
+              <div className="flex justify-between text-sm text-slate-600"><span>已收訂金 (30%)</span><span>{formatCurrency(deposit)}</span></div>
+              <div className="flex justify-between text-sm text-slate-600"><span>待收尾款 (未結案)</span><span>{formatCurrency(tail)}</span></div>
+            </div>
+          </div>
+
+          {techInfo && !isEng && (
+            <div className="bg-white p-4 rounded-xl border border-slate-200 card-modern">
+              <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">接案師傅資訊</h4>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center font-bold text-lg text-slate-600">{techInfo.avatar}</div>
+                <div className="flex-1"><p className="font-bold text-lg">{techInfo.name}</p><p className="text-xs text-slate-500">{techInfo.title} • {techInfo.experience}</p></div>
+                <div className="text-right"><p className="text-yellow-500 font-bold flex items-center gap-1"><Icon name="star" size={14} /> {techInfo.rating}</p></div>
+              </div>
+            </div>
+          )}
+
+          {!isEng && (job.status === "completed" || job.status === "closed") && (
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+              <h4 className="font-bold text-slate-800 flex items-center gap-2"><Icon name="clipboard-check" /> 完工證據</h4>
+
+              {job.photos && job.photos.length > 0 && (
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase mb-2">完工照片</div>
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {job.photos.map((p, i) => (
+                      <img key={i} src={p} className="w-24 h-24 rounded-xl object-cover border" />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {job.signature && (
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase mb-2">客戶簽名</div>
+                  <img src={job.signature} className="w-full max-w-md rounded-xl border bg-white" />
+                </div>
+              )}
+            </div>
+          )}
+
+          {isEng && job.status === "active" && (
+            <div className="space-y-6">
+              {!job.techArrived && (
+                <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl text-amber-700 text-sm font-medium">
+                  請先完成抵達打卡，才能送出完工報告。
+                </div>
+              )}
+
+              {!job.techArrived && <button onClick={() => handleAction("arrive")} className="w-full btn btn-primary py-4 shadow-lg shadow-indigo-200">📍 我已抵達，打卡通知</button>}
+
+              <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2"><Icon name="package" /> 耗材紀錄</h3>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setShowBOM(!showBOM)} className="text-xs font-bold text-indigo-600 bg-white px-3 py-1.5 rounded-full shadow-sm">+ 常用庫</button>
+                    <button onClick={() => setShowCustomMat((v) => !v)} className="text-xs font-bold text-slate-700 bg-white px-3 py-1.5 rounded-full shadow-sm border border-slate-200 hover:bg-slate-50">+ 自訂耗材</button>
+                  </div>
+                </div>
+
+                {showBOM && (
+                  <div className="grid grid-cols-1 gap-2 mb-4 max-h-48 overflow-y-auto">
+                    {WEAK_CURRENT_SUPPLIES.map((m) => (
+                      <button key={m.id} onClick={() => addMat(m)} className="bg-white p-3 rounded-xl text-left text-xs font-bold text-slate-700 shadow-sm flex justify-between"><span>{m.name}</span><span className="text-slate-400">${m.price}</span></button>
+                    ))}
+                  </div>
+                )}
+
+                {showCustomMat && (
+                  <div className="bg-white p-4 rounded-2xl border border-slate-200 mb-4 animate-slide-down">
+                    <div className="grid grid-cols-2 gap-2">
+                      <input className="input-modern py-2" placeholder="耗材名稱" value={customMat.name} onChange={(e) => setCustomMat((p) => ({ ...p, name: e.target.value }))} />
+                      <input className="input-modern py-2" placeholder="單位" value={customMat.unit} onChange={(e) => setCustomMat((p) => ({ ...p, unit: e.target.value }))} />
+                      <input type="number" className="input-modern py-2 text-right font-num" placeholder="單價" value={customMat.price} onChange={(e) => setCustomMat((p) => ({ ...p, price: e.target.value }))} />
+                      <input type="number" className="input-modern py-2 text-right font-num" placeholder="數量" value={customMat.qty} onChange={(e) => setCustomMat((p) => ({ ...p, qty: Number(e.target.value) }))} />
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <button onClick={addCustomMat} className="flex-1 btn btn-primary py-3 rounded-xl">加入</button>
+                      <button onClick={() => setShowCustomMat(false)} className="flex-1 btn btn-outline py-3 rounded-xl">取消</button>
+                    </div>
+                  </div>
+                )}
+
+
+                <div className="space-y-2">
+                  {materials.map((m, i) => (
+                    <div key={m.id || i} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm">
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm text-slate-700 truncate">{m.name}</p>
+                        <div className="text-xs text-slate-400 flex items-center gap-2">
+                          <span>單價</span>
+                          <input type="number" className="w-24 p-1 rounded bg-slate-50 border border-slate-200 text-right font-num" value={m.price} onChange={(e) => updateMatPrice(i, e.target.value)} />
+                          <span>{m.unit ? ` / ${m.unit}` : ""}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => updateMatQty(i, -1)} className="w-7 h-7 rounded-full bg-slate-100 text-slate-700">-</button>
+                        <span className="w-6 text-center font-bold text-sm">{m.qty}</span>
+                        <button onClick={() => updateMatQty(i, 1)} className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-600">+</button>
+                        <span className="font-mono font-bold text-indigo-600 w-20 text-right">${(m.price * m.qty).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {materials.length === 0 && <div className="text-sm text-slate-400">尚未新增耗材，點「常用庫」可快速加入。</div>}
+
+                  <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
+                    <div className="text-sm text-slate-500">材料小計</div>
+                    <div className="font-bold text-slate-900 font-num">{formatCurrency(materialSum)}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-slate-200">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-bold text-slate-700 flex items-center gap-2"><Icon name="camera" /> 完工照片 (必填)</h4>
+                  <span className={`text-xs font-bold ${photos.length > 0 ? "text-emerald-600" : "text-rose-600"}`}>{photos.length > 0 ? `已上傳 ${photos.length} 張` : "尚未上傳"}</span>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  <label className="w-20 h-20 border-2 border-dashed rounded-xl flex items-center justify-center text-slate-400 shrink-0 cursor-pointer hover:bg-slate-50">
+                    <Icon name="plus" />
+                    <input type="file" className="hidden" accept="image/*" multiple onChange={handlePhoto} />
+                  </label>
+                  {photos.map((p, i) => (
+                    <div key={i} className="relative w-20 h-20 shrink-0">
+                      <img src={p} className="w-20 h-20 rounded-xl object-cover border" />
+                      <button onClick={() => removePhoto(i)} className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-900/80 text-white flex items-center justify-center">×</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <SignaturePad value={signature} onChange={setSignature} />
+
+              <button
+                onClick={submit}
+                disabled={!canSubmit}
+                className={`w-full btn btn-primary py-4 text-lg shadow-xl shadow-indigo-200 ${!canSubmit ? "opacity-50 pointer-events-none" : ""}`}
+              >
+                送出報告
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 border-t bg-white sticky bottom-0">
+          {job.status === "open" && isEng && <button onClick={() => handleAction("take")} className="w-full btn btn-primary shadow-xl shadow-indigo-200">立即接案</button>}
+          {job.status === "completed" && !isEng && <button onClick={() => handleAction("pay")} className="w-full btn btn-primary bg-green-600 shadow-xl shadow-green-200">驗收付款</button>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- [Main Views] ---
+
+const BottomNav = ({ active, onSelect, items }) => {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-[40] pb-safe">
+      <div className="mx-auto max-w-3xl">
+        <div className="glass-panel border-t border-slate-100 px-4 py-3">
+          <div className="grid grid-cols-3 gap-2">
+            {items.map((it) => {
+              const isActive = active === it.id;
+              return (
+                <button
+                  key={it.id}
+                  onClick={() => onSelect(it.id)}
+                  className={`py-2 rounded-2xl font-bold text-xs flex flex-col items-center justify-center gap-1 transition ${isActive ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"}`}
+                >
+                  <Icon name={it.icon} size={18} />
+                  <span>{it.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ClientView = ({ user }) => {
+  const { jobs, setJobs, users, logout } = useApp();
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const { addToast } = useToast();
+  const [showInbox, setShowInbox] = useState(false);
+  const [chatJob, setChatJob] = useState(null);
+  const chatPeer = chatJob ? users.find((u) => u.id === chatJob.assignee) : null;
+
+  const [showProfile, setShowProfile] = useState(false);
+  const [nav, setNav] = useState("jobs");
+
+
+  const myJobs = jobs.filter((j) => j.clientId === user.id);
+
+  return (
+    <div className="min-h-screen pb-32">
+      {selectedJob && (
+        <ProjectDetail
+          job={selectedJob}
+          user={user}
+          onClose={() => setSelectedJob(null)}
+          onUpdate={(u) => { setJobs((prev) => prev.map((j) => (j.id === u.id ? normalizeJob(u) : j))); setSelectedJob(normalizeJob(u)); }}
+          addToast={addToast}
+        />
+      )}
+      {showCreate && <ClientCreateJob onClose={() => setShowCreate(false)} />}
+
+      {showInbox && (
+        <ConversationsModal
+          me={user}
+          onClose={() => { setShowInbox(false); setNav("jobs"); }}
+          onOpen={(j) => { setChatJob(normalizeJob(j)); setShowInbox(false); }}
+        />
+      )}
+
+      {chatJob && chatPeer && (
+        <ChatModal
+          job={chatJob}
+          me={user}
+          peer={chatPeer}
+          onUpdate={(u) => {
+            setJobs((prev) => prev.map((j) => (j.id === u.id ? normalizeJob(u) : j)));
+            setChatJob(normalizeJob(u));
+            setSelectedJob((prev) => (prev && prev.id === u.id ? normalizeJob(u) : prev));
+          }}
+          onClose={() => { setChatJob(null); setNav("jobs"); }}
+        />
+      )}
+
+      {showProfile && <ProfileModal user={user} onClose={() => { setShowProfile(false); setNav("jobs"); }} />}
+      <div className="p-6 pt-12 pb-20 bg-indigo-600 text-white rounded-b-[2.5rem] shadow-xl shadow-indigo-200 mb-6 relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-12 opacity-10"><Icon name="zap" size={120} /></div>
+        <div className="flex justify-between items-center mb-6 relative z-10">
+          <div><h1 className="font-bold text-lg">Hi, {user.name}</h1><p className="text-xs text-indigo-200">工程大小事，雲程幫你顧</p></div>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowProfile(true)} className="p-2 rounded-xl bg-white/15 hover:bg-white/20 transition" title="編輯資料"><Icon name="user-cog" /></button>
+            <button onClick={logout} title="登出"><Icon name="log-out" /></button>
+          </div>
+        </div>
+        <button onClick={() => setShowCreate(true)} className="w-full bg-white text-indigo-600 p-4 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 transform transition-transform active:scale-95 relative z-10">
+          <div className="p-1 bg-indigo-100 rounded-full"><Icon name="plus" size={16} /></div>
+          發布新需求
+        </button>
+      </div>
+
+      <div className="px-6 space-y-4">
+        <h3 className="font-bold text-slate-800">進行中案件</h3>
+        {myJobs.map((j) => (
+          <div key={j.id} onClick={() => setSelectedJob(j)} className="card-modern p-5 cursor-pointer">
+            <div className="flex justify-between mb-2"><span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold">{j.status}</span></div>
+            <h4 className="font-bold text-lg text-slate-800 mb-1">{j.title}</h4>
+            <div className="flex justify-between text-xs text-slate-400 font-num"><span>{new Date(j.created_at).toLocaleDateString()}</span><span className="font-bold text-slate-800">${(j.laborBudget + j.materialBudget).toLocaleString()}</span></div>
+          </div>
+        ))}
+        {myJobs.length === 0 && <div className="text-sm text-slate-400">目前沒有案件，點上方按鈕可以快速發案。</div>}
+      </div>
+      <BottomNav
+        active={nav}
+                onSelect={(id) => {
+          if (id === "jobs") {
+            setNav("jobs");
+            setShowInbox(false);
+            setChatJob(null);
+            setShowProfile(false);
+            return;
+          }
+          if (id === "messages") {
+            setNav("messages");
+            setShowProfile(false);
+            setChatJob(null);
+            setShowInbox(true);
+            return;
+          }
+          if (id === "me") {
+            setNav("me");
+            setShowInbox(false);
+            setChatJob(null);
+            setShowProfile(true);
+          }
+        }}
+        items={[
+          { id: "jobs", label: "案件", icon: "file-text" },
+          { id: "messages", label: "訊息", icon: "message-square" },
+          { id: "me", label: "我的", icon: "user" },
+        ]}
+      />
+
+</div>
+  );
+};
+
+
+const WalletModal = ({ user, pendingTail, onWithdraw, onClose }) => {
+  const wallet = Number(user.wallet) || 0;
+
+  return (
+    <div className="fixed inset-0 z-[180] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
+      <div className="bg-white w-full max-w-lg md:rounded-3xl rounded-t-3xl h-[80vh] md:h-[70vh] shadow-2xl overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Icon name="wallet" size={22} />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg text-slate-900">錢包與提領</h3>
+              <p className="text-xs text-slate-400">{user.name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+          <div className="card-modern p-5">
+            <div className="text-xs font-bold text-slate-400 uppercase mb-2">可提領餘額</div>
+            <div className="text-3xl font-bold text-slate-900 font-num">{formatCurrency(wallet)}</div>
+          </div>
+
+          <div className="card-modern p-5">
+            <div className="text-xs font-bold text-slate-400 uppercase mb-2">待收尾款 (待驗收)</div>
+            <div className="text-2xl font-bold text-indigo-600 font-num">{formatCurrency(pendingTail)}</div>
+            <div className="text-xs text-slate-400 mt-2">客戶完成「驗收付款」後會入帳到錢包。</div>
+          </div>
+
+          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+            <div className="text-sm font-bold text-slate-800 mb-2">提領方式</div>
+            <div className="text-xs text-slate-500 mb-4">示範流程：點擊即視為送出申請並從錢包扣款。</div>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => onWithdraw('standard')} className="btn btn-outline py-3 rounded-xl">標準提領</button>
+              <button onClick={() => onWithdraw('fast')} className="btn btn-primary py-3 rounded-xl">閃電提領</button>
+            </div>
+          </div>
+          </div>
+
+        <div className="p-6 border-t border-slate-100 bg-white">
+          <button onClick={onClose} className="w-full btn btn-outline">關閉</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ProfileModal = ({ user, onClose }) => {
+  const { updateUser } = useApp();
+  const { addToast } = useToast();
+
+  const [form, setForm] = useState({
+    name: user?.name || "",
+    phone: user?.phone || "",
+    address: user?.address || "",
+  });
+
+  const roleLabel = user?.role === "engineer" ? "技師" : user?.role?.startsWith("client") ? "客戶" : (user?.role || "");
+
+  const save = () => {
+    const name = String(form.name || "").trim();
+    const phone = String(form.phone || "").trim();
+    const address = String(form.address || "").trim();
+
+    if (!name) {
+      addToast("姓名不可為空", "error");
+      return;
+    }
+
+    const digits = phone.replace(/[^0-9+]/g, "");
+    if (phone && digits.length < 6) {
+      addToast("電話格式不正確", "error");
+      return;
+    }
+
+    updateUser({
+      ...user,
+      name,
+      phone,
+      address,
+      avatar: name ? name[0] : (user.avatar || "U"),
+    });
+
+    addToast("個人資料已更新", "success");
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[190] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
+      <div className="bg-white w-full max-w-lg md:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center">
+              <Icon name="user-cog" size={22} />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg text-slate-900">編輯個人資料</h3>
+              <p className="text-xs text-slate-400">{roleLabel} · {user?.email || ""}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-2 block">姓名</label>
+            <input className="input-modern" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="姓名" />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-2 block">電話</label>
+            <input className="input-modern" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} placeholder="電話" />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-2 block">地址</label>
+            <input className="input-modern" value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} placeholder="地址" />
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-slate-100 bg-white">
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={onClose} className="w-full btn btn-outline">取消</button>
+            <button onClick={save} className="w-full btn btn-primary">儲存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TechView = ({ user }) => {
+  const { jobs, setJobs, users, logout, updateUser } = useApp();
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [tab, setTab] = useState("market");
+  const [showWallet, setShowWallet] = useState(false);
+  const { addToast } = useToast();
+  const [showProfile, setShowProfile] = useState(false);
+  const [showInbox, setShowInbox] = useState(false);
+  const [chatJob, setChatJob] = useState(null);
+  const chatPeer = chatJob ? users.find((u) => u.id === chatJob.clientId) : null;
+  const [nav, setNav] = useState("jobs");
+
+
+
+  const marketJobs = jobs.filter((j) => j.status === "open");
+  const myJobs = jobs.filter((j) => j.assignee === user.id);
+
+  const list = tab === "market" ? marketJobs : myJobs;
+
+  const pendingTail = jobs
+    .filter((j) => j.assignee === user.id && j.status === "completed")
+    .reduce((acc, j) => {
+      const total = calcJobTotal(j);
+      const dep = Number(j.depositAmount) || calcDeposit(total);
+      const tail = Number(j.tailAmount) || (total - dep);
+      return acc + tail;
+    }, 0);
+
+  const onWithdraw = (speed) => {
+    const wallet = Number(user.wallet) || 0;
+    if (wallet <= 0) {
+      addToast("目前沒有可提領餘額", "error");
+      return;
+    }
+
+    updateUser({ ...user, wallet: 0 });
+    addToast(speed === "fast" ? "閃電提領已送出" : "標準提領已送出", "success");
+    setShowWallet(false);
+  };
+
+  return (
+    <div className="min-h-screen pb-32">
+      {selectedJob && (
+        <ProjectDetail
+          job={selectedJob}
+          user={user}
+          onClose={() => setSelectedJob(null)}
+          onUpdate={(u) => { setJobs((prev) => prev.map((j) => (j.id === u.id ? normalizeJob(u) : j))); setSelectedJob(normalizeJob(u)); }}
+          addToast={addToast}
+        />
+      )}
+
+      {showWallet && <WalletModal user={user} pendingTail={pendingTail} onWithdraw={onWithdraw} onClose={() => setShowWallet(false)} />}
+
+      {showInbox && (
+        <ConversationsModal
+          me={user}
+          onClose={() => { setShowInbox(false); setNav("jobs"); }}
+          onOpen={(j) => { setChatJob(normalizeJob(j)); setShowInbox(false); }}
+        />
+      )}
+
+      {chatJob && chatPeer && (
+        <ChatModal
+          job={chatJob}
+          me={user}
+          peer={chatPeer}
+          onUpdate={(u) => {
+            setJobs((prev) => prev.map((j) => (j.id === u.id ? normalizeJob(u) : j)));
+            setChatJob(normalizeJob(u));
+            setSelectedJob((prev) => (prev && prev.id === u.id ? normalizeJob(u) : prev));
+          }}
+          onClose={() => { setChatJob(null); setNav("jobs"); }}
+        />
+      )}
+
+      {showProfile && <ProfileModal user={user} onClose={() => { setShowProfile(false); setNav("jobs"); }} />}
+      <div className="p-6 sticky top-0 bg-white/80 backdrop-blur-md z-10 border-b border-slate-100 flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">{tab === "market" ? "接案大廳" : "我的任務"}</h2>
+          <p className="text-xs text-slate-400">待媒合 {marketJobs.length} | 我的 {myJobs.length}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowProfile(true)} className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200" title="編輯資料"><Icon name="user-cog" size={16} /></button>
+          <button onClick={() => setShowWallet(true)} className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-sm flex items-center gap-2 hover:bg-emerald-100">
+            <Icon name="wallet" size={16} /> <span className="font-num">{formatCurrency(user.wallet)}</span>
+          </button>
+          <button onClick={logout}><Icon name="log-out" /></button>
+        </div>
+      </div>
+
+      <div className="p-4">
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <button onClick={() => setTab("market")} className={`p-3 rounded-2xl font-bold text-sm border transition ${tab === "market" ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+            待媒合
+          </button>
+          <button onClick={() => setTab("mine")} className={`p-3 rounded-2xl font-bold text-sm border transition ${tab === "mine" ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+            我的任務
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {list.map((j) => {
+            const total = calcJobTotal(j);
+            const pro = isProJob(j);
+            const dist = pseudoDistanceKm(j.id);
+            const statusColor = j.status === "open" ? "bg-green-100 text-green-700" : j.status === "active" ? "bg-blue-100 text-blue-700" : j.status === "completed" ? "bg-purple-100 text-purple-700" : "bg-slate-100 text-slate-600";
+
+            return (
+              <div key={j.id} onClick={() => setSelectedJob(j)} className="card-modern p-5 cursor-pointer">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-1 rounded font-bold ${statusColor}`}>{j.status}</span>
+                    {tab === "market" && pro && <span className="text-[10px] px-2 py-1 rounded-full bg-slate-900 text-white font-bold">PRO</span>}
+                  </div>
+                  <span className="font-bold text-lg text-indigo-600 font-num">{formatCurrency(total)}</span>
+                </div>
+                <h3 className="font-bold text-slate-800 mb-1">{j.title}</h3>
+                <div className="flex justify-between items-center text-xs text-slate-500">
+                  <span className="flex items-center gap-1"><Icon name="map-pin" size={12} /> {(j.address || "").substring(0, 10)}...</span>
+                  {tab === "market" && <span className="font-num">約 {dist.toFixed(1)} km</span>}
+                </div>
+              </div>
+            );
+          })}
+
+          {list.length === 0 && (
+            <div className="text-sm text-slate-400 bg-white border border-slate-200 rounded-2xl p-6 text-center">
+              {tab === "market" ? "目前沒有待媒合案件" : "你目前沒有進行中的任務"}
+            </div>
+          )}
+        </div>
+      </div>
+      <BottomNav
+        active={nav}
+                onSelect={(id) => {
+          if (id === "jobs") {
+            setNav("jobs");
+            setShowInbox(false);
+            setChatJob(null);
+            setShowProfile(false);
+            return;
+          }
+          if (id === "messages") {
+            setNav("messages");
+            setShowProfile(false);
+            setChatJob(null);
+            setShowInbox(true);
+            return;
+          }
+          if (id === "me") {
+            setNav("me");
+            setShowInbox(false);
+            setChatJob(null);
+            setShowProfile(true);
+          }
+        }}
+        items={[
+          { id: "jobs", label: "案件", icon: "file-text" },
+          { id: "messages", label: "訊息", icon: "message-square" },
+          { id: "me", label: "我的", icon: "user" },
+        ]}
+      />
+
+</div>
+  );
+};
+
+
+const AdminView = ({ user }) => {
+  const { jobs, setJobs, users, setUsers, logout, resetData } = useApp();
+  const { addToast } = useToast();
+
+  const [view, setView] = useState("overview"); // overview | jobs | users
+  const [showReport, setShowReport] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  const [editJob, setEditJob] = useState(null);
+  const [inspectJob, setInspectJob] = useState(null);
+
+  const [qJobs, setQJobs] = useState("");
+  const [jobStatus, setJobStatus] = useState("all");
+
+  const [userTab, setUserTab] = useState("clients"); // clients | engineers | all
+  const [qUsers, setQUsers] = useState("");
+  const [userStatus, setUserStatus] = useState("all");
+
+  const getUserById = (id) => users.find((u) => u.id === id) || null;
+  const getUserName = (id, fallback = "") => getUserById(id)?.name || fallback || "";
+  const getUserPhone = (id) => getUserById(id)?.phone || "";
+
+  const downloadText = (filename, text, mime = "text/plain;charset=utf-8") => {
+    try {
+      const blob = new Blob([text], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      addToast("匯出失敗，請再試一次", "error");
+    }
+  };
+
+  const csvEscape = (v) => {
+    const s = String(v ?? "");
+    if (/[\",\n\r]/.test(s)) return `"${s.replace(/\"/g, '""')}"`;
+    return s;
+  };
+
+  const toCSV = (rows, headers) => {
+    const cols = headers && headers.length ? headers : (rows[0] ? Object.keys(rows[0]) : []);
+    const lines = [
+      cols.map(csvEscape).join(","),
+      ...rows.map((r) => cols.map((c) => csvEscape(r?.[c])).join(",")),
+    ];
+    return "\ufeff" + lines.join("\n");
+  };
+
+  const exportJobs = (list, format = "csv") => {
+    const rows = list.map((j) => {
+      const total = calcJobTotal(j);
+      const dep = Number(j.depositAmount) || calcDeposit(total);
+      const tail = Number(j.tailAmount) || calcTail(total);
+      return {
+        id: j.id,
+        status: j.status,
+        type: j.type,
+        title: j.title,
+        client: getUserName(j.clientId, j.clientName),
+        client_phone: getUserPhone(j.clientId),
+        engineer: getUserName(j.assignee),
+        engineer_phone: getUserPhone(j.assignee),
+        address: j.address,
+        scheduledDate: j.scheduledDate,
+        laborBudget: j.laborBudget,
+        materialBudget: j.materialBudget,
+        total,
+        deposit_paid: j.deposit_paid ? "Y" : "N",
+        depositAmount: dep,
+        tail_paid: j.tail_paid ? "Y" : "N",
+        tailAmount: tail,
+        created_at: j.created_at,
+        paidAt: j.paidAt || "",
+        photos: (j.photos || []).length,
+        materials: (j.materials || []).length,
+        messages: (j.messages || []).length,
+      };
+    });
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    if (format === "json") return downloadText(`jobs_${stamp}.json`, JSON.stringify(rows, null, 2), "application/json;charset=utf-8");
+    return downloadText(`jobs_${stamp}.csv`, toCSV(rows), "text/csv;charset=utf-8");
+  };
+
+  const exportUsers = (list, format = "csv") => {
+    const rows = list.map((u) => ({
+      id: u.id,
+      role: u.role,
+      status: u.status || "",
+      name: u.name || "",
+      email: u.email || "",
+      phone: u.phone || "",
+      address: u.address || "",
+      company_name: u.company_name || u.company || "",
+      tax_id: u.tax_id || u.taxId || u.taxid || "",
+      title: u.title || "",
+      experience: u.experience || "",
+      rating: u.rating ?? "",
+      jobs: u.jobs ?? "",
+      skills: Array.isArray(u.skills) ? u.skills.join("|") : "",
+      wallet: u.wallet ?? 0,
+    }));
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    if (format === "json") return downloadText(`users_${stamp}.json`, JSON.stringify(rows, null, 2), "application/json;charset=utf-8");
+    return downloadText(`users_${stamp}.csv`, toCSV(rows), "text/csv;charset=utf-8");
+  };
+
+  const engineers = useMemo(() => users.filter((u) => u.role === "engineer"), [users]);
+  const clients = useMemo(() => users.filter((u) => String(u.role || "").startsWith("client")), [users]);
+
+  const filteredJobs = useMemo(() => {
+    const q = qJobs.trim().toLowerCase();
+    return jobs
+      .filter((j) => (jobStatus === "all" ? true : j.status === jobStatus))
+      .filter((j) => {
+        if (!q) return true;
+        const hay = [
+          j.id,
+          j.title,
+          j.type,
+          j.address,
+          j.desc,
+          getUserName(j.clientId, j.clientName),
+          getUserName(j.assignee),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [jobs, qJobs, jobStatus, users]);
+
+  const filteredUsers = useMemo(() => {
+    const q = qUsers.trim().toLowerCase();
+    const base = userTab === "clients" ? clients : userTab === "engineers" ? engineers : users;
+    return base
+      .filter((u) => (userStatus === "all" ? true : String(u.status || "") === userStatus))
+      .filter((u) => {
+        if (!q) return true;
+        const hay = [u.id, u.name, u.email, u.phone, u.address, u.company_name, u.company, u.title]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      });
+  }, [userTab, qUsers, userStatus, users, clients, engineers]);
+
+  const jobsByStatus = useMemo(() => {
+    return jobs.reduce((acc, j) => {
+      const k = j.status || "open";
+      acc[k] = (acc[k] || 0) + 1;
+      return acc;
+    }, {});
+  }, [jobs]);
+
+  const lifetimeRevenue = useMemo(() => {
+    return jobs
+      .filter((j) => j.status === "closed")
+      .reduce((acc, j) => acc + (Number(j.releasedTotal) || calcJobTotal(j)), 0);
+  }, [jobs]);
+
+  const escrowTailOutstanding = useMemo(() => {
+    return jobs
+      .filter((j) => j.status !== "closed")
+      .reduce((acc, j) => {
+        const total = calcJobTotal(j);
+        const dep = Number(j.depositAmount) || calcDeposit(total);
+        const tail = Number(j.tailAmount) || (total - dep);
+        return acc + tail;
+      }, 0);
+  }, [jobs]);
+
+  const todayKey = new Date().toLocaleDateString();
+  const createdToday = useMemo(() => jobs.filter((j) => new Date(j.created_at).toLocaleDateString() === todayKey), [jobs, todayKey]);
+  const closedToday = useMemo(() => jobs.filter((j) => j.paidAt && new Date(j.paidAt).toLocaleDateString() === todayKey), [jobs, todayKey]);
+
+  const todayDepositCollected = useMemo(() => {
+    return createdToday.reduce((acc, j) => {
+      if (!j.deposit_paid) return acc;
+      const total = calcJobTotal(j);
+      const dep = Number(j.depositAmount) || calcDeposit(total);
+      return acc + dep;
+    }, 0);
+  }, [createdToday]);
+
+  const todayTailCollected = useMemo(() => {
+    return closedToday.reduce((acc, j) => {
+      const total = calcJobTotal(j);
+      const dep = Number(j.depositAmount) || calcDeposit(total);
+      const tail = Number(j.tailAmount) || (total - dep);
+      return acc + tail;
+    }, 0);
+  }, [closedToday]);
+
+  const cashRevenueToday = todayDepositCollected + todayTailCollected;
+
+  const sevenDayRevenue = useMemo(() => {
+    const days = Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return d.toLocaleDateString();
+    });
+    const byKey = new Map(days.map((k) => [k, 0]));
+
+    jobs.forEach((j) => {
+      const total = calcJobTotal(j);
+      const dep = Number(j.depositAmount) || calcDeposit(total);
+      const tail = Number(j.tailAmount) || (total - dep);
+
+      const createdKey = new Date(j.created_at).toLocaleDateString();
+      if (j.deposit_paid && byKey.has(createdKey)) byKey.set(createdKey, byKey.get(createdKey) + dep);
+
+      if (j.paidAt) {
+        const paidKey = new Date(j.paidAt).toLocaleDateString();
+        if (byKey.has(paidKey)) byKey.set(paidKey, byKey.get(paidKey) + tail);
+      }
+    });
+
+    return days.map((k) => byKey.get(k) || 0);
+  }, [jobs]);
+  const DailyReport = ({ onClose }) => {
+    const report = {
+      date: todayKey,
+      jobs_created: createdToday.length,
+      jobs_closed: closedToday.length,
+      deposit_collected: todayDepositCollected,
+      tail_collected: todayTailCollected,
+      cash_revenue: cashRevenueToday,
+      tail_outstanding_total: escrowTailOutstanding,
+    };
+
+    return (
+      <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4">
+        <div className="bg-white w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl">
+          <div className="bg-gradient-to-br from-indigo-600 to-slate-900 p-6 text-white text-center">
+            <h2 className="text-2xl font-bold">每日營運日報</h2>
+            <p className="opacity-90">{todayKey}</p>
+          </div>
+
+          <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <p className="text-xs text-slate-400">今日新增</p>
+              <h3 className="text-2xl font-bold">{createdToday.length}</h3>
+            </div>
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <p className="text-xs text-slate-400">今日完工</p>
+              <h3 className="text-2xl font-bold">{closedToday.length}</h3>
+            </div>
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <p className="text-xs text-slate-400">已收訂金 (30%)</p>
+              <h3 className="text-xl font-bold text-indigo-600 font-num">{formatCurrency(todayDepositCollected)}</h3>
+            </div>
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <p className="text-xs text-slate-400">今日收尾款</p>
+              <h3 className="text-xl font-bold text-emerald-600 font-num">{formatCurrency(todayTailCollected)}</h3>
+            </div>
+          </div>
+
+          <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="card-modern p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase">今日現金流營收</div>
+                  <div className="text-xs text-slate-400 mt-1">訂金 + 今日驗收尾款</div>
+                </div>
+                <div className="text-2xl font-bold text-emerald-600 font-num">{formatCurrency(cashRevenueToday)}</div>
+              </div>
+            </div>
+            <div className="card-modern p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase">待收尾款 (未結案)</div>
+                  <div className="text-xs text-slate-400 mt-1">應收帳款總額</div>
+                </div>
+                <div className="text-2xl font-bold text-rose-600 font-num">{formatCurrency(escrowTailOutstanding)}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 pb-6">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+              <div className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                <Icon name="download" size={16} /> 匯出日報
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => downloadText(`daily_report_${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(report, null, 2), "application/json;charset=utf-8")} className="btn btn-outline px-4 py-2 rounded-xl">JSON</button>
+                <button onClick={() => downloadText(`daily_report_${new Date().toISOString().slice(0, 10)}.csv`, toCSV([report]), "text/csv;charset=utf-8")} className="btn btn-outline px-4 py-2 rounded-xl">CSV</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 border-t flex gap-3">
+            <button onClick={onClose} className="flex-1 btn btn-primary">關閉</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const EditUserModal = ({ data, onClose }) => {
+    const [form, setForm] = useState({ ...data });
+    const isEngineer = form.role === "engineer";
+    const isClientBiz = form.role === "client_business";
+
+    const save = () => {
+      setUsers((prev) => prev.map((u) => (u.id === data.id ? { ...u, ...form } : u)));
+      addToast("會員資料已更新", "success");
+      onClose();
+    };
+
+    return (
+      <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4">
+        <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <div className="text-xs text-slate-400 font-mono">{form.id}</div>
+              <h3 className="font-bold text-lg">編輯會員</h3>
+            </div>
+            <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">姓名</label>
+              <input className="input-modern" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">Email/帳號</label>
+              <input className="input-modern" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">電話</label>
+              <input className="input-modern" value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">地址</label>
+              <input className="input-modern" value={form.address || ""} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">角色</label>
+              <select className="input-modern" value={form.role || ""} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                <option value="admin">admin</option>
+                <option value="client_personal">client_personal</option>
+                <option value="client_business">client_business</option>
+                <option value="engineer">engineer</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">狀態</label>
+              <select className="input-modern" value={form.status || "active"} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                <option value="active">active</option>
+                <option value="verified">verified</option>
+                <option value="pending">pending</option>
+                <option value="suspended">suspended</option>
+              </select>
+            </div>
+
+            {isClientBiz && (
+              <>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">公司名稱</label>
+                  <input className="input-modern" value={form.company_name || form.company || ""} onChange={(e) => setForm({ ...form, company_name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">統一編號</label>
+                  <input className="input-modern" value={form.tax_id || form.taxId || ""} onChange={(e) => setForm({ ...form, tax_id: e.target.value })} />
+                </div>
+              </>
+            )}
+
+            {isEngineer && (
+              <>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">職稱</label>
+                  <input className="input-modern" value={form.title || ""} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">年資</label>
+                  <input className="input-modern" value={form.experience || ""} onChange={(e) => setForm({ ...form, experience: e.target.value })} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-500 block mb-1">技能 (用逗號分隔)</label>
+                  <input
+                    className="input-modern"
+                    value={Array.isArray(form.skills) ? form.skills.join(",") : (form.skills || "")}
+                    onChange={(e) => setForm({ ...form, skills: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+                  />
+                </div>
+              </>
+            )}
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">錢包餘額</label>
+              <input className="input-modern" type="number" value={Number(form.wallet) || 0} onChange={(e) => setForm({ ...form, wallet: Number(e.target.value) || 0 })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">密碼</label>
+              <input className="input-modern" value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="mt-6 flex gap-3">
+            <button onClick={onClose} className="flex-1 btn btn-outline">取消</button>
+            <button onClick={save} className="flex-1 btn btn-primary">保存</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  const EditJobModal = ({ data, onClose }) => {
+    const [form, setForm] = useState({ ...data });
+
+    const save = () => {
+      const merged = normalizeJob({ ...data, ...form });
+      if (merged.status === "closed" && !merged.paidAt) merged.paidAt = new Date().toISOString();
+      setJobs((prev) => prev.map((j) => (j.id === data.id ? merged : j)));
+      addToast("工單資料已更新", "success");
+      onClose();
+    };
+
+    const total = calcJobTotal(form);
+
+    return (
+      <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4">
+        <div className="bg-white w-full max-w-3xl rounded-2xl p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <div className="text-xs text-slate-400 font-mono">{form.id}</div>
+              <h3 className="font-bold text-lg">編輯工單</h3>
+            </div>
+            <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="md:col-span-2">
+              <label className="text-xs font-bold text-slate-500 block mb-1">標題</label>
+              <input className="input-modern" value={form.title || ""} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">類別</label>
+              <input className="input-modern" value={form.type || ""} onChange={(e) => setForm({ ...form, type: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">狀態</label>
+              <select className="input-modern" value={form.status || "open"} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                <option value="open">open</option>
+                <option value="active">active</option>
+                <option value="completed">completed</option>
+                <option value="closed">closed</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">客戶</label>
+              <select className="input-modern" value={form.clientId || ""} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
+                <option value="">(未指定)</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.id})</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">工程師</label>
+              <select className="input-modern" value={form.assignee || ""} onChange={(e) => setForm({ ...form, assignee: e.target.value || null })}>
+                <option value="">(未指派)</option>
+                {engineers.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
+                ))}
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-xs font-bold text-slate-500 block mb-1">地址</label>
+              <input className="input-modern" value={form.address || ""} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-xs font-bold text-slate-500 block mb-1">描述</label>
+              <textarea className="input-modern h-24 resize-none" value={form.desc || ""} onChange={(e) => setForm({ ...form, desc: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">預約時間</label>
+              <input className="input-modern" value={form.scheduledDate || ""} onChange={(e) => setForm({ ...form, scheduledDate: e.target.value })} />
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs font-bold text-slate-500 mb-2">金額</div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <div className="text-[10px] text-slate-400">工資</div>
+                  <input className="input-modern py-2" type="number" value={Number(form.laborBudget) || 0} onChange={(e) => setForm({ ...form, laborBudget: Number(e.target.value) || 0 })} />
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-400">材料</div>
+                  <input className="input-modern py-2" type="number" value={Number(form.materialBudget) || 0} onChange={(e) => setForm({ ...form, materialBudget: Number(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <div className="text-xs text-slate-500">總計</div>
+                <div className="font-bold text-slate-900 font-num">{formatCurrency(total)}</div>
+              </div>
+            </div>
+
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-slate-500">訂金已收</div>
+                  <input type="checkbox" checked={Boolean(form.deposit_paid)} onChange={(e) => setForm({ ...form, deposit_paid: e.target.checked })} />
+                </div>
+                <div className="mt-2">
+                  <label className="text-[10px] text-slate-400 block mb-1">訂金金額</label>
+                  <input className="input-modern py-2" type="number" value={Number(form.depositAmount) || 0} onChange={(e) => setForm({ ...form, depositAmount: Number(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-2xl p-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-slate-500">尾款已收</div>
+                  <input type="checkbox" checked={Boolean(form.tail_paid)} onChange={(e) => setForm({ ...form, tail_paid: e.target.checked })} />
+                </div>
+                <div className="mt-2">
+                  <label className="text-[10px] text-slate-400 block mb-1">尾款金額</label>
+                  <input className="input-modern py-2" type="number" value={Number(form.tailAmount) || 0} onChange={(e) => setForm({ ...form, tailAmount: Number(e.target.value) || 0 })} />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">建立時間</label>
+              <input className="input-modern" value={form.created_at || ""} onChange={(e) => setForm({ ...form, created_at: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">驗收付款時間</label>
+              <input className="input-modern" value={form.paidAt || ""} onChange={(e) => setForm({ ...form, paidAt: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="mt-6 flex gap-3">
+            <button onClick={onClose} className="flex-1 btn btn-outline">取消</button>
+            <button onClick={save} className="flex-1 btn btn-primary">保存</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const JobInspectModal = ({ data, onClose }) => {
+    const j = normalizeJob(data);
+    const total = calcJobTotal(j);
+    const dep = Number(j.depositAmount) || calcDeposit(total);
+    const tail = Number(j.tailAmount) || calcTail(total);
+    const matSum = (j.materials || []).reduce((acc, m) => acc + (Number(m.price) || 0) * (Number(m.qty) || 0), 0);
+
+    return (
+      <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4">
+        <div className="bg-white w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl">
+          <div className="p-6 border-b flex items-start justify-between">
+            <div>
+              <div className="text-xs text-slate-400 font-mono">{j.id}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <StatusBadge status={j.status} />
+                <h3 className="font-bold text-lg text-slate-800">{j.title}</h3>
+              </div>
+              <div className="text-xs text-slate-500 mt-2 flex flex-wrap gap-4">
+                <span className="flex items-center gap-1"><Icon name="user" size={14} /> 客戶: {getUserName(j.clientId, j.clientName) || "-"}</span>
+                <span className="flex items-center gap-1"><Icon name="wrench" size={14} /> 工程師: {getUserName(j.assignee) || "-"}</span>
+                <span className="flex items-center gap-1"><Icon name="map-pin" size={14} /> {j.address || "-"}</span>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+          </div>
+
+          <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">預算總計</div>
+              <div className="text-2xl font-bold text-slate-900 font-num">{formatCurrency(total)}</div>
+              <div className="text-xs text-slate-400 mt-2">訂金 {formatCurrency(dep)} | 尾款 {formatCurrency(tail)}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">耗材小計</div>
+              <div className="text-2xl font-bold text-indigo-600 font-num">{formatCurrency(matSum)}</div>
+              <div className="text-xs text-slate-400 mt-2">筆數 {(j.materials || []).length}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">訊息 / 照片</div>
+              <div className="text-2xl font-bold text-slate-900 font-num">{(j.messages || []).length} / {(j.photos || []).length}</div>
+              <div className="text-xs text-slate-400 mt-2">簽名 {j.signature ? "有" : "無"}</div>
+            </div>
+          </div>
+
+          <div className="p-6 border-t flex gap-3">
+            <button onClick={() => { setEditJob(j); onClose(); }} className="flex-1 btn btn-outline">編輯工單</button>
+            <button onClick={onClose} className="flex-1 btn btn-primary">關閉</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row">
+      {showReport && <DailyReport onClose={() => setShowReport(false)} />}
+      {editUser && <EditUserModal data={editUser} onClose={() => setEditUser(null)} />}
+      {editJob && <EditJobModal data={editJob} onClose={() => setEditJob(null)} />}
+      {inspectJob && <JobInspectModal data={inspectJob} onClose={() => setInspectJob(null)} />}
+
+      <aside className="w-full md:w-72 bg-white border-r p-6 flex flex-col">
+        <div className="flex items-center gap-3 font-bold text-xl text-indigo-700 mb-8"><Icon name="cloud-lightning" /> 雲程中控</div>
+
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6">
+          <div className="text-xs text-slate-500">登入身分</div>
+          <div className="font-bold text-slate-800 mt-1">{user?.name || "Admin"}</div>
+          <div className="text-xs text-slate-400 mt-1">God Mode</div>
+        </div>
+
+        <nav className="space-y-1 flex-1">
+          {[{ id: "overview", label: "戰情儀表", icon: "layout-dashboard" }, { id: "jobs", label: "全域工單", icon: "file-text" }, { id: "users", label: "客戶 / 工程師", icon: "users" }].map((i) => (
+            <button key={i.id} onClick={() => setView(i.id)} className={`w-full text-left p-3 rounded-xl font-bold flex items-center gap-3 transition-all ${view === i.id ? "bg-indigo-50 text-indigo-700 ring-2 ring-indigo-100" : "text-slate-500 hover:bg-slate-50"}`}>
+              <Icon name={i.icon} size={18} /> {i.label}
+            </button>
+          ))}
+        </nav>
+
+        <button onClick={() => setShowReport(true)} className="mb-3 w-full py-3 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-lg flex items-center justify-center gap-2"><Icon name="file-text" size={16} /> 生成日報</button>
+
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <button onClick={() => exportJobs(filteredJobs, "csv")} className="btn btn-outline px-3 py-2 rounded-xl"><Icon name="download" size={16} /> 匯出工單</button>
+          <button onClick={() => exportUsers(filteredUsers, "csv")} className="btn btn-outline px-3 py-2 rounded-xl"><Icon name="download" size={16} /> 匯出會員</button>
+        </div>
+
+        <button onClick={resetData} className="mb-3 w-full py-3 bg-rose-50 text-rose-700 rounded-xl text-sm font-bold border border-rose-100 hover:bg-rose-100 flex items-center justify-center gap-2"><Icon name="trash-2" size={16} /> 重置 Demo 資料</button>
+
+        <button onClick={logout} className="text-slate-400 hover:text-red-500 flex items-center gap-2 px-3"><Icon name="log-out" size={16} /> 登出系統</button>
+      </aside>
+
+      <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+        {view === "overview" && (
+          <>
+            <div className="flex items-end justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">戰情儀表</h2>
+                <div className="text-sm text-slate-500 mt-1">全域數據總覽，可直接匯出工單與會員報表</div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => exportJobs(jobs, "csv")} className="btn btn-outline px-4 py-2 rounded-xl">工單 CSV</button>
+                <button onClick={() => exportUsers(users, "csv")} className="btn btn-outline px-4 py-2 rounded-xl">會員 CSV</button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">總營收 (已結案)</div>
+                <div className="text-2xl font-bold text-emerald-600 font-num">{formatCurrency(lifetimeRevenue)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">待收尾款 (未結案)</div>
+                <div className="text-2xl font-bold text-rose-600 font-num">{formatCurrency(escrowTailOutstanding)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">今日現金流營收</div>
+                <div className="text-2xl font-bold text-slate-900 font-num">{formatCurrency(cashRevenueToday)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">今日新增 / 完工</div>
+                <div className="text-2xl font-bold text-indigo-700 font-num">{createdToday.length} / {closedToday.length}</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4">
+              <div className="card-modern p-5 md:col-span-2">
+                <div className="text-xs text-slate-400 mb-3">案件狀態分布</div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {["open", "active", "completed", "closed"].map((k) => (
+                    <div key={k} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
+                      <div className="font-bold text-slate-700">{k}</div>
+                      <div className="font-bold text-indigo-700 font-num">{jobsByStatus[k] || 0}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 text-xs text-slate-400">會員：客戶 {clients.length} / 工程師 {engineers.length}</div>
+              </div>
+
+              <div className="card-modern p-5 md:col-span-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-bold text-slate-800">近 7 日現金流趨勢</div>
+                  <div className="text-xs text-slate-400">訂金 + 尾款</div>
+                </div>
+                <SimpleBarChart data={sevenDayRevenue} />
+              </div>
+            </div>
+
+            <div className="card-modern p-6 mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-slate-800">最新工單</h3>
+                <button onClick={() => setView("jobs")} className="text-sm font-bold text-indigo-600 hover:underline">前往全域工單</button>
+              </div>
+              <div className="space-y-2">
+                {filteredJobs.slice(0, 5).map((j) => (
+                  <div key={j.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={j.status} />
+                        <div className="font-bold text-slate-800 truncate">{j.title}</div>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1 truncate">{getUserName(j.clientId, j.clientName) || "-"} · {j.address || "-"}</div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="font-bold text-indigo-700 font-num">{formatCurrency(calcJobTotal(j))}</div>
+                      <button onClick={() => setInspectJob(j)} className="btn btn-outline px-3 py-2 rounded-xl">查看</button>
+                      <button onClick={() => setEditJob(j)} className="btn btn-outline px-3 py-2 rounded-xl">編輯</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+        {view === "jobs" && (
+          <>
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">全域工單</h2>
+                <div className="text-sm text-slate-500 mt-1">搜尋、篩選、編輯、匯出</div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => exportJobs(filteredJobs, "csv")} className="btn btn-outline px-4 py-2 rounded-xl">匯出 CSV</button>
+                <button onClick={() => exportJobs(filteredJobs, "json")} className="btn btn-outline px-4 py-2 rounded-xl">匯出 JSON</button>
+              </div>
+            </div>
+
+            <div className="card-modern p-5 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-500 block mb-1">搜尋</label>
+                  <input className="input-modern" placeholder="ID/標題/地址/客戶/工程師/描述…" value={qJobs} onChange={(e) => setQJobs(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">狀態</label>
+                  <select className="input-modern" value={jobStatus} onChange={(e) => setJobStatus(e.target.value)}>
+                    <option value="all">全部</option>
+                    <option value="open">open</option>
+                    <option value="active">active</option>
+                    <option value="completed">completed</option>
+                    <option value="closed">closed</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-3 text-xs text-slate-400">共 {filteredJobs.length} 筆</div>
+            </div>
+
+            <div className="card-modern overflow-hidden">
+              <div className="overflow-x-auto no-scrollbar">
+                <table className="min-w-[1100px] w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500 border-b sticky top-0">
+                    <tr>
+                      <th className="p-4">ID</th>
+                      <th className="p-4">狀態</th>
+                      <th className="p-4">類別</th>
+                      <th className="p-4">標題</th>
+                      <th className="p-4">客戶</th>
+                      <th className="p-4">工程師</th>
+                      <th className="p-4">金額</th>
+                      <th className="p-4">訂金</th>
+                      <th className="p-4">尾款</th>
+                      <th className="p-4">建立</th>
+                      <th className="p-4">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredJobs.map((j) => {
+                      const total = calcJobTotal(j);
+                      const dep = Number(j.depositAmount) || calcDeposit(total);
+                      const tail = Number(j.tailAmount) || calcTail(total);
+                      return (
+                        <tr key={j.id} className="border-b hover:bg-slate-50 align-top">
+                          <td className="p-4 font-mono text-slate-400">{String(j.id).slice(-10)}</td>
+                          <td className="p-4"><StatusBadge status={j.status} /></td>
+                          <td className="p-4 text-slate-600">{j.type || "-"}</td>
+                          <td className="p-4">
+                            <div className="font-bold text-slate-800">{j.title}</div>
+                            <div className="text-xs text-slate-400 mt-1">{j.address || "-"}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="font-bold text-slate-800">{getUserName(j.clientId, j.clientName) || "-"}</div>
+                            <div className="text-xs text-slate-400 mt-1">{getUserPhone(j.clientId) || ""}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="font-bold text-slate-800">{getUserName(j.assignee) || "-"}</div>
+                            <div className="text-xs text-slate-400 mt-1">{getUserPhone(j.assignee) || ""}</div>
+                          </td>
+                          <td className="p-4 font-bold text-indigo-700 font-num">{formatCurrency(total)}</td>
+                          <td className="p-4">
+                            <div className={`font-bold font-num ${j.deposit_paid ? "text-emerald-600" : "text-slate-400"}`}>{formatCurrency(dep)}</div>
+                            <div className="text-[10px] text-slate-400">{j.deposit_paid ? "已收" : "未收"}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className={`font-bold font-num ${j.tail_paid ? "text-emerald-600" : "text-slate-400"}`}>{formatCurrency(tail)}</div>
+                            <div className="text-[10px] text-slate-400">{j.tail_paid ? "已收" : "未收"}</div>
+                          </td>
+                          <td className="p-4 text-xs text-slate-500">{j.created_at ? new Date(j.created_at).toLocaleString() : "-"}</td>
+                          <td className="p-4">
+                            <div className="flex gap-2">
+                              <button onClick={() => setInspectJob(j)} className="text-slate-700 font-bold hover:underline">查看</button>
+                              <button onClick={() => setEditJob(j)} className="text-indigo-600 font-bold hover:underline">編輯</button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+
+        {view === "users" && (
+          <>
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">客戶 / 工程師</h2>
+                <div className="text-sm text-slate-500 mt-1">完整資料、可編輯、可匯出</div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => exportUsers(filteredUsers, "csv")} className="btn btn-outline px-4 py-2 rounded-xl">匯出 CSV</button>
+                <button onClick={() => exportUsers(filteredUsers, "json")} className="btn btn-outline px-4 py-2 rounded-xl">匯出 JSON</button>
+              </div>
+            </div>
+
+            <div className="card-modern p-5 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4">
+                {[{ id: "clients", label: `客戶 (${clients.length})` }, { id: "engineers", label: `工程師 (${engineers.length})` }, { id: "all", label: `全部 (${users.length})` }].map((t) => (
+                  <button key={t.id} onClick={() => setUserTab(t.id)} className={`px-4 py-2 rounded-xl font-bold text-sm border transition ${userTab === t.id ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-500 block mb-1">搜尋</label>
+                  <input className="input-modern" placeholder="姓名/電話/Email/地址/公司/職稱…" value={qUsers} onChange={(e) => setQUsers(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">狀態</label>
+                  <select className="input-modern" value={userStatus} onChange={(e) => setUserStatus(e.target.value)}>
+                    <option value="all">全部</option>
+                    <option value="active">active</option>
+                    <option value="verified">verified</option>
+                    <option value="pending">pending</option>
+                    <option value="suspended">suspended</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-3 text-xs text-slate-400">共 {filteredUsers.length} 筆</div>
+            </div>
+
+            <div className="card-modern overflow-hidden">
+              <div className="overflow-x-auto no-scrollbar">
+                <table className="min-w-[1100px] w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500 border-b sticky top-0">
+                    <tr>
+                      <th className="p-4">姓名</th>
+                      <th className="p-4">角色</th>
+                      <th className="p-4">狀態</th>
+                      <th className="p-4">電話</th>
+                      <th className="p-4">地址</th>
+                      <th className="p-4">公司/職稱</th>
+                      <th className="p-4">錢包</th>
+                      <th className="p-4">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((u) => (
+                      <tr key={u.id} className="border-b hover:bg-slate-50 align-top">
+                        <td className="p-4">
+                          <div className="font-bold text-slate-800">{u.name}</div>
+                          <div className="text-xs text-slate-400 mt-1 font-mono">{u.id}</div>
+                          <div className="text-xs text-slate-400 mt-1">{u.email}</div>
+                        </td>
+                        <td className="p-4"><span className="bg-slate-100 px-2 py-1 rounded-lg text-xs font-bold">{u.role}</span></td>
+                        <td className="p-4">
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${String(u.status) === "suspended" ? "bg-rose-100 text-rose-700" : String(u.status) === "pending" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                            {u.status || "-"}
+                          </span>
+                        </td>
+                        <td className="p-4 text-slate-600">{u.phone || "-"}</td>
+                        <td className="p-4 text-slate-600">{u.address || "-"}</td>
+                        <td className="p-4 text-slate-600">
+                          <div className="font-bold text-slate-700">{u.company_name || u.company || u.title || "-"}</div>
+                          <div className="text-xs text-slate-400 mt-1">{u.tax_id || u.taxId || u.experience || ""}</div>
+                        </td>
+                        <td className="p-4 font-bold text-indigo-700 font-num">{formatCurrency(u.wallet || 0)}</td>
+                        <td className="p-4">
+                          <button onClick={() => setEditUser(u)} className="text-indigo-600 font-bold hover:underline">編輯</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+      </main>
+    </div>
+  );
+};
+
+
+// --- App ---
+const App = () => {
+  const { user } = useApp();
+  const [showHelp, setShowHelp] = useState(false);
+  const [showDiag, setShowDiag] = useState(false);
+
+  return (
+    <>
+      {!user ? (
+        <AuthScreen />
+      ) : user.role === "admin" ? (
+        <AdminView user={user} />
+      ) : user.role.startsWith("client") ? (
+        <ClientView user={user} />
+      ) : (
+        <TechView user={user} />
+      )}
+
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} onDiagnostics={() => { setShowHelp(false); setShowDiag(true); }} />}
+
+      {showDiag && <DiagnosticsModal onClose={() => setShowDiag(false)} />}
+
+      <button
+        onClick={() => setShowHelp(true)}
+        className="fixed bottom-24 right-6 z-[40] w-14 h-14 rounded-2xl bg-white border border-slate-200 shadow-xl flex items-center justify-center text-indigo-600 hover:bg-slate-50 active:scale-95 transition"
+        aria-label="操作說明"
+        title="操作說明"
+      >
+        <Icon name="help-circle" size={22} />
+      </button>
+    </>
+  );
+};
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+  <ErrorBoundary>
+    <AppProvider>
+      <ToastProvider>
+        <App />
+      </ToastProvider>
+    </AppProvider>
+  </ErrorBoundary>
+);
+
+
+
+
+
+
+</script>
+  </body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
