@@ -229,6 +229,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -2915,6 +2916,35 @@ const ClientView = ({ user }) => {
           發布新需求
         </button>
       </div>
+      <div className="card-modern p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-bold text-slate-800">工程款摘要</div>
+          <button onClick={() => setShowWallet(true)} className="text-xs font-bold text-indigo-600 hover:underline">查看提領</button>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+            <div className="text-xs text-slate-400">累計工程款</div>
+            <div className="text-xl font-bold text-slate-900 font-num">{formatCurrency(completedIncomeTotal)}</div>
+          </div>
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+            <div className="text-xs text-slate-400">未領尾款</div>
+            <div className="text-xl font-bold text-amber-600 font-num">{formatCurrency(pendingTail)}</div>
+          </div>
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+            <div className="text-xs text-slate-400">已領金額</div>
+            <div className="text-xl font-bold text-emerald-600 font-num">{formatCurrency(withdrawnTotal)}</div>
+          </div>
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+            <div className="text-xs text-slate-400">可提領</div>
+            <div className="text-xl font-bold text-indigo-700 font-num">{formatCurrency(availableWithdrawTotal)}</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 text-sm text-slate-600">
+          <div>申請中：{formatCurrency(pendingWithdrawTotal)}</div>
+          <div>已核准待匯：{formatCurrency(approvedWithdrawTotal)}</div>
+          <div>已匯款：{formatCurrency(paidWithdrawTotal)}</div>
+        </div>
+      </div>
 
       <div className="mx-auto max-w-3xl px-4 space-y-4">
         <div className="card-modern p-5">
@@ -3442,10 +3472,15 @@ const TechView = ({ user }) => {
       const tail = Number(j.tailAmount) || (total - dep);
       return acc + tail;
     }, 0);
+  const completedIncomeJobs = useMemo(() => jobs.filter((j) => j.assignee === user.id && j.status === "closed"), [jobs, user.id]);
+  const completedIncomeTotal = useMemo(() => completedIncomeJobs.reduce((acc, j) => acc + calcJobTotal(j), 0), [completedIncomeJobs]);
 
   const myWithdrawals = useMemo(() => withdrawals.filter((w) => w.userId === user.id), [withdrawals, user.id]);
   const withdrawnTotal = myWithdrawals.filter((w) => w.status === "approved" || w.status === "paid").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
   const pendingWithdrawTotal = myWithdrawals.filter((w) => w.status === "pending").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+  const approvedWithdrawTotal = myWithdrawals.filter((w) => w.status === "approved").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+  const paidWithdrawTotal = myWithdrawals.filter((w) => w.status === "paid").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+  const availableWithdrawTotal = Number(user.wallet) || 0;
   const earnedTotal = useMemo(() => {
     return jobs
       .filter((j) => j.assignee === user.id && (j.status === "closed" || j.paidAt))
@@ -5747,7 +5782,7 @@ const AdminView = ({ user }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row md:h-screen md:overflow-hidden">
+    <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row md:min-h-screen md:overflow-visible">
       {showReport && <DailyReport onClose={() => setShowReport(false)} />}
       {editUser && <EditUserModal data={editUser} onClose={() => setEditUser(null)} />}
       {inspectUser && <UserInspectModal data={inspectUser} onClose={() => setInspectUser(null)} />}
@@ -5758,7 +5793,7 @@ const AdminView = ({ user }) => {
       {importOpen && <ImportModal onClose={() => setImportOpen(false)} />}
       {auditOpen && <AuditModal onClose={() => setAuditOpen(false)} />}
 
-      <aside className="w-full md:w-80 bg-white border-r p-6 flex flex-col md:h-screen md:overflow-y-auto">
+      <aside className="w-full md:w-80 bg-white border-r p-6 flex flex-col md:min-h-screen md:overflow-y-auto">
         <div className="flex items-center gap-3 font-bold text-xl text-indigo-700 mb-6"><Icon name="cloud-lightning" /> 雲程中控</div>
 
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5">
@@ -5802,7 +5837,7 @@ const AdminView = ({ user }) => {
         </button>
       </aside>
 
-      <main className="flex-1 min-h-0 p-6 md:p-8 overflow-y-auto md:h-screen">
+      <main className="flex-1 min-h-0 p-6 md:p-8 overflow-y-auto md:min-h-screen">
         {view === "overview" && (
           <>
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
@@ -6621,9 +6656,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
