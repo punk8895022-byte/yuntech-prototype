@@ -236,6 +236,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -936,25 +937,52 @@ const useToast = () => useContext(ToastContext);
 const ErrorBoundary = class extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
 
   static getDerivedStateFromError() {
-    return { hasError: true };
+    return { hasError: true, error: null };
+  }
+
+  componentDidCatch(error, info) {
+    this.setState({ error: error || null });
+    try {
+      if (typeof window !== "undefined") {
+        window.__cloudlink_last_error = {
+          message: error?.message || "Unknown error",
+          stack: error?.stack || "",
+          info: info?.componentStack || "",
+          at: new Date().toISOString(),
+        };
+      }
+    } catch {}
   }
 
   render() {
     if (this.state.hasError)
       return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-lg text-center space-y-4">
-            <div className="text-xl font-bold text-slate-900">畫面發生錯誤</div>
-            <div className="text-sm text-slate-500">系統已攔截錯誤，請重新整理頁面。如果是上傳圖片導致，請減少圖片大小或數量。</div>
-            <button
-              className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white"
-              onClick={() => window.location.reload()}
-            >
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-lg space-y-4">
+            <div className="text-2xl font-bold text-slate-900">畫面發生錯誤</div>
+            <div className="text-sm text-slate-500 leading-7">
+              {this.state.error?.message || "系統已攔截錯誤，請先清除本機資料再重新登入。"}
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500 whitespace-pre-wrap max-h-56 overflow-auto">
+              {this.state.error?.stack || window.__cloudlink_last_error?.info || "無堆疊資訊"}
+            </div>
+            <button className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white" onClick={() => window.location.reload()}>
               重新整理
+            </button>
+            <button
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold text-slate-700"
+              onClick={() => {
+                try {
+                  window.localStorage.clear();
+                } catch {}
+                window.location.reload();
+              }}
+            >
+              清除本機資料並重整
             </button>
           </div>
         </div>
@@ -6823,9 +6851,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
