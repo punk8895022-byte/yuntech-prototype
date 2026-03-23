@@ -227,6 +227,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -566,6 +567,67 @@ const mapsUrlForAddress = (address) => {
   return `https://www.google.com/maps/search/?api=1&query=${q}`;
 };
 
+const safeStorageSet = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    console.warn(`Failed to write storage key: ${key}`, error);
+    return false;
+  }
+};
+
+const safeStorageGet = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn(`Failed to read storage key: ${key}`, error);
+    return fallback;
+  }
+};
+
+const compressImageFile = (file, maxWidth = 1280, quality = 0.82) =>
+  new Promise((resolve, reject) => {
+    if (!file || !file.type || !file.type.startsWith("image/")) {
+      reject(new Error("不支援的圖片格式"));
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      try {
+        const ratio = Math.min(1, maxWidth / Math.max(img.width || maxWidth, 1));
+        const width = Math.max(1, Math.round((img.width || maxWidth) * ratio));
+        const height = Math.max(1, Math.round((img.height || maxWidth) * ratio));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(objectUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      } catch (error) {
+        reject(error);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("圖片載入失敗"));
+    };
+
+    img.src = objectUrl;
+  });
+
 const StatusProgress = ({ status }) => {
   const info = getStatusProgress(status);
   return (
@@ -608,7 +670,7 @@ const AppContext = createContext();
 const AppProvider = ({ children }) => {
   const [users, setUsers] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("cl_users_v101")) || DB_DEFAULTS.users;
+      return safeStorageGet("cl_users_v101", DB_DEFAULTS.users) || DB_DEFAULTS.users;
     } catch {
       return DB_DEFAULTS.users;
     }
@@ -616,7 +678,7 @@ const AppProvider = ({ children }) => {
 
   const [jobs, setJobs] = useState(() => {
     try {
-      const raw = JSON.parse(localStorage.getItem("cl_jobs_v101")) || DB_DEFAULTS.jobs;
+      const raw = safeStorageGet("cl_jobs_v101", DB_DEFAULTS.jobs) || DB_DEFAULTS.jobs;
       return raw.map(normalizeJob);
     } catch {
       return DB_DEFAULTS.jobs.map(normalizeJob);
@@ -625,7 +687,7 @@ const AppProvider = ({ children }) => {
 
   const [withdrawals, setWithdrawals] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("cl_withdrawals_v101")) || DB_DEFAULTS.withdrawals || [];
+      return safeStorageGet("cl_withdrawals_v101", DB_DEFAULTS.withdrawals || []) || [];
     } catch {
       return DB_DEFAULTS.withdrawals || [];
     }
@@ -634,14 +696,16 @@ const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    localStorage.setItem("cl_users_v101", JSON.stringify(users));
+    safeStorageSet("cl_users_v101", JSON.stringify(users));
   }, [users]);
 
   useEffect(() => {
-    localStorage.setItem("cl_jobs_v101", JSON.stringify(jobs.map(normalizeJob)));
+    if (!safeStorageSet("cl_jobs_v101", JSON.stringify(jobs.map(normalizeJob)))) {
+      console.warn("Job data was not persisted because browser storage is full.");
+    }
   }, [jobs]);
   useEffect(() => {
-    localStorage.setItem("cl_withdrawals_v101", JSON.stringify(withdrawals));
+    safeStorageSet("cl_withdrawals_v101", JSON.stringify(withdrawals));
   }, [withdrawals]);
   useEffect(() => {
     if (!user) return;
@@ -783,7 +847,21 @@ const ErrorBoundary = class extends React.Component {
   }
 
   render() {
-    if (this.state.hasError) return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading...</div>;
+    if (this.state.hasError)
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-lg text-center space-y-4">
+            <div className="text-xl font-bold text-slate-900">畫面發生錯誤</div>
+            <div className="text-sm text-slate-500">系統已攔截錯誤，請重新整理頁面。如果是上傳圖片導致，請減少圖片大小或數量。</div>
+            <button
+              className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white"
+              onClick={() => window.location.reload()}
+            >
+              重新整理
+            </button>
+          </div>
+        </div>
+      );
     return this.props.children;
   }
 };
@@ -1467,7 +1545,7 @@ const AuthScreen = () => {
       address: form.address,
       status: role === "engineer" ? "pending" : "active",
       avatar: form.name ? form.name[0] : "U",
-      wallet: role.startsWith("client") ? 100000 : 0,
+      wallet: String(role || "").startsWith("client") ? 100000 : 0,
       ...(role === "client_business" ? { company: form.company || "", taxId: form.taxId || "" } : {}),
       ...(role === "engineer"
         ? {
@@ -2258,18 +2336,25 @@ const total = calcJobTotal(job);
     setShowCustomMat(false);
   };
 
-  const handlePhoto = (e) => {
+  const handlePhoto = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    files.forEach((file) => {
-      const r = new FileReader();
-      r.onload = (v) => {
-        setPhotos((prev) => [...prev, v.target.result]);
+    for (const file of files) {
+      try {
+        if ((Number(file.size) || 0) > 8 * 1024 * 1024) {
+          addToast("圖片過大，請選擇 8MB 以下檔案", "error");
+          continue;
+        }
+        const imageDataUrl = await compressImageFile(file);
+        setPhotos((prev) => [...prev, imageDataUrl]);
         setPhotoMeta((prev) => [...prev, { note: "", mark: "" }]);
-      };
-      r.readAsDataURL(file);
-    });
+      } catch (error) {
+        addToast("圖片處理失敗，請改用較小檔案", "error");
+      }
+    }
+
+    e.target.value = "";
   };
 
   const removePhoto = (idx) => {
@@ -2292,22 +2377,23 @@ const total = calcJobTotal(job);
   const materialSum = materials.reduce((acc, m) => acc + (Number(m.price) || 0) * (Number(m.qty) || 0), 0);
 
   const submit = () => {
-    if (!job.techArrived) {
-      addToast("請先抵達打卡，再送出報告", "error");
-      return;
-    }
-    if (photos.length === 0) {
-      addToast("請至少上傳 1 張完工照片", "error");
-      return;
-    }
-    if (!signature) {
-      addToast("請先完成客戶簽名", "error");
-      return;
-    }
-    if (photoMeta.length !== photos.length) {
-      addToast("照片說明/點位數量不一致，請檢查", "error");
-      return;
-    }
+    try {
+      if (!job.techArrived) {
+        addToast("請先抵達打卡，再送出報告", "error");
+        return;
+      }
+      if (photos.length === 0) {
+        addToast("請至少上傳 1 張完工照片", "error");
+        return;
+      }
+      if (!signature) {
+        addToast("請先完成客戶簽名", "error");
+        return;
+      }
+      if (photoMeta.length !== photos.length) {
+        addToast("照片說明/點位數量不一致，請檢查", "error");
+        return;
+      }
 
       onUpdate({
         ...job,
@@ -2319,8 +2405,12 @@ const total = calcJobTotal(job);
         reportSubmittedAt: new Date().toISOString(),
         materialSum,
       });
-    addToast("報告送出，等待客戶驗收", "success");
-    onClose();
+      addToast("報告送出，等待客戶驗收", "success");
+      onClose();
+    } catch (error) {
+      console.error(error);
+      addToast("送出失敗，請重新整理後再試", "error");
+    }
   };
 
   const canSubmit = Boolean(job.techArrived) && photos.length > 0 && Boolean(signature);
@@ -2375,7 +2465,7 @@ const total = calcJobTotal(job);
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 pb-32 space-y-6">
-          {(job.assignee || user.role.startsWith("client")) && (
+          {(job.assignee || String(user.role || "").startsWith("client")) && (
             <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={() => (peerUser ? setShowCall(true) : addToast("尚未媒合技師，暫無法通話", "error"))}
@@ -6215,7 +6305,7 @@ const App = () => {
         <AuthScreen />
       ) : user.role === "admin" ? (
         <AdminView user={user} />
-      ) : user.role.startsWith("client") ? (
+      ) : String(user.role || "").startsWith("client") ? (
         <ClientView user={user} />
       ) : (
         <TechView user={user} />
@@ -6287,9 +6377,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
