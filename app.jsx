@@ -1,4 +1,4 @@
-﻿const { useState, useEffect, useMemo, useContext, createContext } = React;
+﻿const { useState, useEffect, useMemo, useContext, createContext, useRef } = React;
 
 // --- [0. Core: Icon System] ---
 const Icon = ({ name, size = 20, className = "", ...props }) => {
@@ -32,6 +32,8 @@ const PROJECT_CATEGORIES = [
       { id: "w1", name: "電話總機分機", unit: "式", price: 1500, labor: 1000 },
       { id: "w2", name: "對講機安裝", unit: "式", price: 3000, labor: 1500 },
       { id: "w3", name: "廣播喇叭", unit: "只", price: 2500, labor: 1200 },
+      { id: "w4", name: "門鈴/蜂鳴器", unit: "組", price: 1800, labor: 900 },
+      { id: "w5", name: "管線整理", unit: "式", price: 1200, labor: 1200 },
     ],
   },
   {
@@ -44,6 +46,8 @@ const PROJECT_CATEGORIES = [
       { id: "n2", name: "Wi-Fi AP 安裝", unit: "台", price: 4500, labor: 1500 },
       { id: "n3", name: "網路機櫃整線", unit: "式", price: 5000, labor: 5000 },
       { id: "n4", name: "路由器設定", unit: "台", price: 2000, labor: 2000 },
+      { id: "n5", name: "光纖熔接/測試", unit: "點", price: 3500, labor: 2000 },
+      { id: "n6", name: "交換器安裝", unit: "台", price: 2800, labor: 1200 },
     ],
   },
   {
@@ -56,6 +60,8 @@ const PROJECT_CATEGORIES = [
       { id: "c2", name: "半球型攝影機 (含線)", unit: "支", price: 3500, labor: 1500 },
       { id: "c3", name: "4路 NVR 主機", unit: "台", price: 4500, labor: 1000 },
       { id: "c4", name: "8路 NVR 主機", unit: "台", price: 7500, labor: 1000 },
+      { id: "c5", name: "監視器調角/測試", unit: "支", price: 1200, labor: 800 },
+      { id: "c6", name: "硬碟安裝/格式化", unit: "台", price: 1800, labor: 800 },
     ],
   },
   {
@@ -68,10 +74,32 @@ const PROJECT_CATEGORIES = [
       { id: "a2", name: "陽極鎖安裝", unit: "組", price: 4500, labor: 2500 },
       { id: "a3", name: "感應讀卡機", unit: "台", price: 3500, labor: 1500 },
       { id: "a4", name: "開門按鈕", unit: "顆", price: 800, labor: 500 },
+      { id: "a5", name: "門禁主機設定", unit: "台", price: 2800, labor: 1800 },
+      { id: "a6", name: "刷卡權限建置", unit: "式", price: 2500, labor: 1500 },
     ],
   },
-  { id: "info", label: "資訊工程", icon: "server", color: "indigo", subItems: [{ id: "i1", name: "伺服器上架", unit: "式", price: 3000, labor: 3000 }] },
-  { id: "pc", label: "電腦維修", icon: "monitor", color: "slate", subItems: [{ id: "p1", name: "系統重灌", unit: "台", price: 800, labor: 800 }] },
+  {
+    id: "info",
+    label: "資訊工程",
+    icon: "server",
+    color: "indigo",
+    subItems: [
+      { id: "i1", name: "伺服器上架", unit: "式", price: 3000, labor: 3000 },
+      { id: "i2", name: "NAS 儲存設定", unit: "台", price: 2800, labor: 1800 },
+      { id: "i3", name: "備份排程建置", unit: "式", price: 2400, labor: 1600 },
+    ],
+  },
+  {
+    id: "pc",
+    label: "電腦維修",
+    icon: "monitor",
+    color: "slate",
+    subItems: [
+      { id: "p1", name: "系統重灌", unit: "台", price: 800, labor: 800 },
+      { id: "p2", name: "資料備份/移轉", unit: "台", price: 1500, labor: 1500 },
+      { id: "p3", name: "病毒清除/優化", unit: "台", price: 1200, labor: 1200 },
+    ],
+  },
 ];
 
 const SUPPLIES_DB = [
@@ -132,6 +160,13 @@ const DB_DEFAULTS = {
     },
   ],
   withdrawals: [],
+  inventory: [
+    { id: "S-001", name: "Cat.6 網路線", category: "網路耗材", unit: "箱", quantity: 18, minQuantity: 8, location: "A1-01", supplier: "常用庫", cost: 4200, note: "主線材", updatedAt: new Date().toISOString() },
+    { id: "S-002", name: "RJ45 水晶頭", category: "網路耗材", unit: "盒", quantity: 60, minQuantity: 20, location: "A1-02", supplier: "常用庫", cost: 180, note: "備品", updatedAt: new Date().toISOString() },
+    { id: "S-003", name: "500萬 IPCam", category: "監控設備", unit: "台", quantity: 12, minQuantity: 4, location: "B2-03", supplier: "監控供應商", cost: 3500, note: "", updatedAt: new Date().toISOString() },
+    { id: "S-004", name: "8路 NVR 主機", category: "監控設備", unit: "台", quantity: 4, minQuantity: 2, location: "B2-04", supplier: "監控供應商", cost: 8500, note: "", updatedAt: new Date().toISOString() },
+    { id: "S-005", name: "陽極鎖", category: "門禁設備", unit: "組", quantity: 8, minQuantity: 3, location: "C3-01", supplier: "門禁供應商", cost: 2200, note: "", updatedAt: new Date().toISOString() },
+  ],
   jobs: [
     {
       id: "J-2026021501",
@@ -171,6 +206,14 @@ const DB_DEFAULTS = {
 const normalizeJob = (job) => {
   const laborBudget = Number.parseInt(job.laborBudget ?? job.budget_labor ?? job.labor ?? 0, 10) || 0;
   const materialBudget = Number.parseInt(job.materialBudget ?? job.budget_material ?? job.material ?? 0, 10) || 0;
+  const photos = Array.isArray(job.photos)
+    ? job.photos.map((p) => trimDataUrl(p)).filter(Boolean).slice(0, MAX_JOB_PHOTOS)
+    : [];
+  const photoMeta = sanitizePhotoMeta(photos, job.photoMeta);
+  const supplementPhotos = Array.isArray(job.supplementPhotos)
+    ? job.supplementPhotos.map((p) => trimDataUrl(p)).filter(Boolean).slice(0, MAX_JOB_PHOTOS)
+    : [];
+  const supplementPhotoMeta = sanitizePhotoMeta(supplementPhotos, job.supplementPhotoMeta);
 
   return {
     id: job.id ?? `J-${Date.now()}`,
@@ -198,10 +241,10 @@ const normalizeJob = (job) => {
     materialSum: Number(job.materialSum ?? 0) || 0,
     materials: Array.isArray(job.materials) ? job.materials : [],
     messages: Array.isArray(job.messages) ? job.messages : [],
-    customItems: Array.isArray(job.customItems) ? job.customItems : [],
-    photos: Array.isArray(job.photos) ? job.photos : [],
-    photoMeta: Array.isArray(job.photoMeta) ? job.photoMeta : [],
-    signature: typeof job.signature === "string" ? job.signature : null,
+    customItems: Array.isArray(job.customItems) ? job.customItems.slice(0, 20) : [],
+    photos,
+    photoMeta,
+    signature: trimDataUrl(job.signature, MAX_DATA_URL_LENGTH),
     acceptanceNote: job.acceptanceNote ?? "",
     acceptanceFlag: Boolean(job.acceptanceFlag ?? false),
     acceptanceAt: job.acceptanceAt ?? null,
@@ -210,7 +253,28 @@ const normalizeJob = (job) => {
     auditNote: job.auditNote ?? "",
     auditAt: job.auditAt ?? null,
     auditBy: job.auditBy ?? null,
-    
+    supplementNote: String(job.supplementNote ?? "").trim(),
+    supplementAt: job.supplementAt ?? null,
+    supplementBy: job.supplementBy ?? null,
+    supplementPhotos,
+    supplementPhotoMeta,
+  };
+};
+
+const normalizeInventoryItem = (item) => {
+  return {
+    id: item?.id ?? `S-${Date.now()}`,
+    name: String(item?.name || "").trim(),
+    category: String(item?.category || "一般").trim(),
+    unit: String(item?.unit || "個").trim(),
+    quantity: Number(item?.quantity ?? 0) || 0,
+    minQuantity: Number(item?.minQuantity ?? item?.min_quantity ?? 0) || 0,
+    location: String(item?.location || "").trim(),
+    supplier: String(item?.supplier || "").trim(),
+    cost: Number(item?.cost ?? item?.price ?? 0) || 0,
+    note: String(item?.note || "").trim(),
+    updatedAt: item?.updatedAt || new Date().toISOString(),
+    status: String(item?.status || "").trim(),
   };
 };
 
@@ -226,12 +290,83 @@ const calcTail = (total) => (Number(total) || 0) - calcDeposit(total);
 
 const isProJob = (job) => calcJobTotal(job) >= 20000;
 
+const MAX_DATA_URL_LENGTH = 160000;
+const MAX_JOB_PHOTOS = 4;
+const MAX_USER_PHOTO_LENGTH = 140000;
+
+const trimDataUrl = (value, maxLength = MAX_DATA_URL_LENGTH) => {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return null;
+  if (!text.startsWith("data:image/")) return null;
+  if (text.length > maxLength) return null;
+  return text;
+};
+
+const sanitizePhotoMeta = (photos, meta) => {
+  const photoList = Array.isArray(photos) ? photos : [];
+  const metaList = Array.isArray(meta) ? meta : [];
+  return photoList.map((_, idx) => {
+    const item = metaList[idx] || {};
+    return {
+      note: String(item.note || "").slice(0, 120),
+      mark: String(item.mark || "").slice(0, 120),
+    };
+  });
+};
+
+const normalizeUser = (user) => {
+  const role = String(user?.role || "").trim();
+  const skills = Array.isArray(user?.skills)
+    ? user.skills.map((skill) => String(skill || "").trim()).filter(Boolean).slice(0, 12)
+    : [];
+
+  return {
+    ...user,
+    id: user?.id ?? `U-${Date.now()}`,
+    name: String(user?.name || "").trim(),
+    email: String(user?.email || "").trim(),
+    password: String(user?.password || ""),
+    role: role || "client_personal",
+    phone: String(user?.phone || "").trim(),
+    address: String(user?.address || "").trim(),
+    company: String(user?.company || user?.company_name || "").trim(),
+    company_name: String(user?.company_name || user?.company || "").trim(),
+    taxId: String(user?.taxId || user?.tax_id || "").trim(),
+    tax_id: String(user?.tax_id || user?.taxId || "").trim(),
+    experience: String(user?.experience || "").trim(),
+    title: String(user?.title || "").trim(),
+    licenseNo: String(user?.licenseNo || user?.license || "").trim(),
+    license: String(user?.license || user?.licenseNo || "").trim(),
+    emergencyName: String(user?.emergencyName || "").trim(),
+    emergencyPhone: String(user?.emergencyPhone || "").trim(),
+    withdrawAccount: String(user?.withdrawAccount || "").trim(),
+    bankName: String(user?.bankName || "").trim(),
+    bankCode: String(user?.bankCode || "").trim(),
+    accountNo: String(user?.accountNo || "").trim(),
+    accountName: String(user?.accountName || "").trim(),
+    bankBookPhoto: trimDataUrl(user?.bankBookPhoto, MAX_USER_PHOTO_LENGTH),
+    avatar: String(user?.avatar || "").trim() || (String(user?.name || "").trim() ? String(user.name).trim()[0] : "U"),
+    status: String(user?.status || (role === "engineer" ? "pending" : "active")),
+    wallet: Number(user?.wallet) || 0,
+    rating: Number(user?.rating) || (role === "engineer" ? 5 : 0),
+    jobs: Number(user?.jobs) || 0,
+    skills,
+  };
+};
+
 const JOB_STATUS_FLOW = [
   { id: "open", label: "媒合中", percent: 25 },
   { id: "active", label: "施工中", percent: 50 },
   { id: "completed", label: "待驗收", percent: 75 },
   { id: "closed", label: "已結案", percent: 100 },
 ];
+
+const JOB_STATUS_LABEL = {
+  open: "媒合中",
+  active: "施工中",
+  completed: "待驗收",
+  closed: "已完成",
+};
 
 const USER_STATUS_LABEL = {
   active: "啟用中",
@@ -240,11 +375,52 @@ const USER_STATUS_LABEL = {
   suspended: "已停權",
 };
 
+const WITHDRAWAL_STATUS_LABEL = {
+  pending: "待審核",
+  approved: "已核准待匯",
+  paid: "已匯款",
+  rejected: "已拒絕",
+};
+
 const getStatusProgress = (status) => {
   return JOB_STATUS_FLOW.find((s) => s.id === status) || JOB_STATUS_FLOW[0];
 };
 
 const userStatusLabel = (status) => USER_STATUS_LABEL[status] || status || "-";
+const withdrawalStatusLabel = (status) => WITHDRAWAL_STATUS_LABEL[status] || status || "-";
+
+const getJobAgeDays = (job) => {
+  const createdAt = new Date(job?.created_at || job?.createdAt || Date.now()).getTime();
+  if (!Number.isFinite(createdAt)) return 0;
+  return Math.max(0, Math.floor((Date.now() - createdAt) / 86400000));
+};
+
+const getJobSlaDays = (status) => {
+  if (status === "open") return 2;
+  if (status === "active") return 4;
+  if (status === "completed") return 2;
+  return 999;
+};
+
+const getJobNextAction = (job) => {
+  if (!job) return "待補資料";
+  if (job.auditStatus === "needs_fix" && !(job.supplementAt || (Array.isArray(job.supplementPhotos) && job.supplementPhotos.length > 0))) return "等待工程師補件";
+  if (job.supplementAt && job.auditStatus === "unreviewed") return "等待管理端複查";
+  if (job.status === "open") return job.assignee ? "等待技師確認" : "等待指派技師";
+  if (job.status === "active") return job.techArrived ? "等待完工回報" : "等待抵達打卡";
+  if (job.status === "completed") return job.acceptanceFlag ? "等待管理端複查" : "等待客戶驗收";
+  if (job.status === "closed") return job.auditStatus === "needs_fix" ? "已結案，待補件" : "案件已結案";
+  return "待補資料";
+};
+
+const getJobRiskState = (job) => {
+  const age = getJobAgeDays(job);
+  const limit = getJobSlaDays(job?.status);
+  if (job?.status !== "closed" && age > limit) return { label: "逾期", tone: "danger", age, limit };
+  if (job?.status === "completed") return { label: "待驗收", tone: "warning", age, limit };
+  if (job?.status === "active") return { label: "施工中", tone: "info", age, limit };
+  return { label: "正常", tone: "ok", age, limit };
+};
 
 // Deterministic pseudo distance for demo (no GPS required).
 const pseudoDistanceKm = (seed) => {
@@ -262,6 +438,91 @@ const mapsUrlForAddress = (address) => {
   const q = encodeURIComponent(address || "");
   return `https://www.google.com/maps/search/?api=1&query=${q}`;
 };
+
+const roleGroup = (role) => {
+  const value = String(role || "").trim().toLowerCase();
+  if (value.startsWith("client")) return "client";
+  if (value === "engineer" || value === "tech") return "engineer";
+  if (value === "admin") return "admin";
+  return "other";
+};
+
+const roleLabel = (role) => {
+  if (roleGroup(role) === "client") return "客戶";
+  if (roleGroup(role) === "engineer") return "工程師";
+  if (roleGroup(role) === "admin") return "管理";
+  return role || "-";
+};
+
+const safeStorageSet = (key, value) => {
+  try {
+    const bytes = typeof Blob !== "undefined" ? new Blob([value]).size : String(value || "").length * 2;
+    if (bytes > 3.5 * 1024 * 1024) {
+      console.warn(`Storage payload too large for key: ${key} (${Math.round(bytes / 1024)} KB)`);
+      return false;
+    }
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    console.warn(`Failed to write storage key: ${key}`, error);
+    return false;
+  }
+};
+
+const safeStorageGet = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn(`Failed to read storage key: ${key}`, error);
+    return fallback;
+  }
+};
+
+const compressImageFile = (file, maxWidth = 960, quality = 0.68) =>
+  new Promise((resolve, reject) => {
+    if (!file || !file.type || !file.type.startsWith("image/")) {
+      reject(new Error("不支援的圖片格式"));
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      try {
+        const ratio = Math.min(1, maxWidth / Math.max(img.width || maxWidth, 1));
+        const width = Math.max(1, Math.round((img.width || maxWidth) * ratio));
+        const height = Math.max(1, Math.round((img.height || maxWidth) * ratio));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(objectUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        try {
+          resolve(canvas.toDataURL("image/webp", quality));
+        } catch {
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        }
+      } catch (error) {
+        reject(error);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("圖片載入失敗"));
+    };
+
+    img.src = objectUrl;
+  });
 
 const StatusProgress = ({ status }) => {
   const info = getStatusProgress(status);
@@ -305,15 +566,16 @@ const AppContext = createContext();
 const AppProvider = ({ children }) => {
   const [users, setUsers] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("cl_users_v101")) || DB_DEFAULTS.users;
+      const loaded = safeStorageGet("cl_users_v101", DB_DEFAULTS.users) || DB_DEFAULTS.users;
+      return Array.isArray(loaded) ? loaded.map(normalizeUser) : DB_DEFAULTS.users.map(normalizeUser);
     } catch {
-      return DB_DEFAULTS.users;
+      return DB_DEFAULTS.users.map(normalizeUser);
     }
   });
 
   const [jobs, setJobs] = useState(() => {
     try {
-      const raw = JSON.parse(localStorage.getItem("cl_jobs_v101")) || DB_DEFAULTS.jobs;
+      const raw = safeStorageGet("cl_jobs_v101", DB_DEFAULTS.jobs) || DB_DEFAULTS.jobs;
       return raw.map(normalizeJob);
     } catch {
       return DB_DEFAULTS.jobs.map(normalizeJob);
@@ -322,32 +584,60 @@ const AppProvider = ({ children }) => {
 
   const [withdrawals, setWithdrawals] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("cl_withdrawals_v101")) || DB_DEFAULTS.withdrawals || [];
+      return safeStorageGet("cl_withdrawals_v101", DB_DEFAULTS.withdrawals || []) || [];
     } catch {
       return DB_DEFAULTS.withdrawals || [];
+    }
+  });
+
+  const [inventory, setInventory] = useState(() => {
+    try {
+      const loaded = safeStorageGet("cl_inventory_v101", DB_DEFAULTS.inventory || []) || [];
+      return Array.isArray(loaded) ? loaded.map(normalizeInventoryItem) : (DB_DEFAULTS.inventory || []).map(normalizeInventoryItem);
+    } catch {
+      return (DB_DEFAULTS.inventory || []).map(normalizeInventoryItem);
     }
   });
 
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    localStorage.setItem("cl_users_v101", JSON.stringify(users));
+    safeStorageSet("cl_users_v101", JSON.stringify(users.map(normalizeUser)));
   }, [users]);
 
   useEffect(() => {
-    localStorage.setItem("cl_jobs_v101", JSON.stringify(jobs.map(normalizeJob)));
+    if (!safeStorageSet("cl_jobs_v101", JSON.stringify(jobs.map(normalizeJob)))) {
+      console.warn("Job data was not persisted because browser storage is full.");
+    }
   }, [jobs]);
   useEffect(() => {
-    localStorage.setItem("cl_withdrawals_v101", JSON.stringify(withdrawals));
+    safeStorageSet("cl_withdrawals_v101", JSON.stringify(withdrawals));
   }, [withdrawals]);
+  useEffect(() => {
+    safeStorageSet("cl_inventory_v101", JSON.stringify(inventory.map(normalizeInventoryItem)));
+  }, [inventory]);
+  globalThis.__cloudlink_users_ref = users;
   useEffect(() => {
     if (!user) return;
     const latest = users.find((u) => u.id === user.id);
     if (latest && latest !== user) setUser(latest);
   }, [users, user]);
 
-  const login = (email, password) => {
-    const u = users.find((u) => (u.email === email || u.name === email) && u.password === password);
+  const login = (email, password, role) => {
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedName = String(email || "").trim();
+    const u = users.find((item) => {
+      const accountMatch =
+        String(item.email || "").trim().toLowerCase() === normalizedEmail || String(item.name || "").trim() === normalizedName;
+      const passwordMatch = String(item.password || "") === String(password || "");
+      const roleMatch = !role || roleGroup(item.role) === roleGroup(role);
+      return accountMatch && passwordMatch && roleMatch;
+    }) || users.find((item) => {
+      const accountMatch =
+        String(item.email || "").trim().toLowerCase() === normalizedEmail || String(item.name || "").trim() === normalizedName;
+      const passwordMatch = String(item.password || "") === String(password || "");
+      return accountMatch && passwordMatch;
+    });
     if (u) {
       setUser(u);
       return true;
@@ -360,8 +650,9 @@ const AppProvider = ({ children }) => {
   const addJob = (jobData) => setJobs((prev) => [normalizeJob(jobData), ...prev]);
   const updateJob = (updatedJob) => setJobs((prev) => prev.map((j) => (j.id === updatedJob.id ? normalizeJob(updatedJob) : j)));
   const updateUser = (updatedUser) => {
-    setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
-    setUser((prev) => (prev && prev.id === updatedUser.id ? updatedUser : prev));
+    const next = normalizeUser(updatedUser);
+    setUsers((prev) => prev.map((u) => (u.id === next.id ? next : u)));
+    setUser((prev) => (prev && prev.id === next.id ? next : prev));
   };
 
   const requestWithdrawal = ({ userId, amount, speed, accountInfo }) => {
@@ -378,6 +669,7 @@ const AppProvider = ({ children }) => {
       accountNo: accountInfo?.accountNo || "",
       accountName: accountInfo?.accountName || "",
       withdrawAccount: accountInfo?.withdrawAccount || "",
+      bankBookPhoto: trimDataUrl(accountInfo?.bankBookPhoto, MAX_USER_PHOTO_LENGTH),
       note: "",
       reviewedAt: null,
       reviewerId: null,
@@ -390,8 +682,9 @@ const AppProvider = ({ children }) => {
     setWithdrawals((prev) => prev.map((w) => (w.id === id ? { ...w, ...patch } : w)));
   };
   const registerUser = (newUser) => {
-    setUsers((prev) => [...prev, newUser]);
-    setUser(newUser);
+    const next = normalizeUser(newUser);
+    setUsers((prev) => [...prev, next]);
+    setUser(next);
   };
 
   const resetData = () => {
@@ -407,6 +700,8 @@ const AppProvider = ({ children }) => {
         jobs,
         users,
         withdrawals,
+        inventory,
+        setInventory,
         login,
         logout,
         addJob,
@@ -427,6 +722,11 @@ const AppProvider = ({ children }) => {
 };
 
 const useApp = () => useContext(AppContext);
+
+const getUserName = (id, fallback = "") => {
+  const users = Array.isArray(globalThis.__cloudlink_users_ref) ? globalThis.__cloudlink_users_ref : [];
+  return users.find((u) => u.id === id)?.name || fallback || "";
+};
 
 // --- [3. UI Components] ---
 const ToastContext = createContext(null);
@@ -459,15 +759,56 @@ const useToast = () => useContext(ToastContext);
 const ErrorBoundary = class extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
 
   static getDerivedStateFromError() {
-    return { hasError: true };
+    return { hasError: true, error: null };
+  }
+
+  componentDidCatch(error, info) {
+    this.setState({ error: error || null });
+    try {
+      if (typeof window !== "undefined") {
+        window.__cloudlink_last_error = {
+          message: error?.message || "Unknown error",
+          stack: error?.stack || "",
+          info: info?.componentStack || "",
+          at: new Date().toISOString(),
+        };
+      }
+    } catch {}
   }
 
   render() {
-    if (this.state.hasError) return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading...</div>;
+    if (this.state.hasError)
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-lg space-y-4">
+            <div className="text-2xl font-bold text-slate-900">畫面發生錯誤</div>
+            <div className="text-sm text-slate-500 leading-7">
+              {this.state.error?.message || "系統已攔截錯誤，請先清除本機資料再重新登入。"}
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500 whitespace-pre-wrap max-h-56 overflow-auto">
+              {this.state.error?.stack || window.__cloudlink_last_error?.info || "無堆疊資訊"}
+            </div>
+            <button className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white" onClick={() => window.location.reload()}>
+              重新整理
+            </button>
+            <button
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold text-slate-700"
+              onClick={() => {
+                try {
+                  window.localStorage.clear();
+                } catch {}
+                window.location.reload();
+              }}
+            >
+              清除本機資料並重整
+            </button>
+          </div>
+        </div>
+      );
     return this.props.children;
   }
 };
@@ -853,6 +1194,10 @@ const DiagnosticsModal = ({ onClose }) => {
         acceptance_note: j.acceptanceNote || "",
         acceptance_at: j.acceptanceAt || "",
         acceptance_by: getUserName(j.acceptanceBy),
+        supplement_note: j.supplementNote || "",
+        supplement_at: j.supplementAt || "",
+        supplement_by: getUserName(j.supplementBy),
+        supplement_photo_count: (j.supplementPhotos || []).length,
         audit_status: j.auditStatus || "",
         audit_note: j.auditNote || "",
         audit_at: j.auditAt || "",
@@ -871,6 +1216,7 @@ const DiagnosticsModal = ({ onClose }) => {
       if (i.status === "closed" && (!i.acceptance_at || !i.acceptance_by)) issues.push(`工單 ${i.id}：結案但缺少驗收紀錄`);
       if (i.photo_meta_ok !== "Y") issues.push(`工單 ${i.id}：照片說明/點位數量不一致`);
       if (i.acceptance_flag === "Y" && i.abnormal_note_ok !== "Y") issues.push(`工單 ${i.id}：標記異常但缺少驗收備註`);
+      if (i.audit_status === "needs_fix" && !i.supplement_at) issues.push(`工單 ${i.id}：稽核需補件但尚未回報`);
     });
 
     return {
@@ -891,7 +1237,7 @@ const DiagnosticsModal = ({ onClose }) => {
     try {
       const results = [];
 
-      const sampleClient = users.find((u) => String(u.role || "").startsWith("client")) || null;
+      const sampleClient = users.find((u) => roleGroup(u.role) === "client") || null;
       const sampleEng = users.find((u) => u.role === "engineer") || null;
 
       results.push({
@@ -1113,6 +1459,7 @@ const AuthScreen = () => {
   const { login, registerUser, resetData } = useApp();
   const [view, setView] = useState("landing");
   const [role, setRole] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -1150,7 +1497,7 @@ const AuthScreen = () => {
       address: form.address,
       status: role === "engineer" ? "pending" : "active",
       avatar: form.name ? form.name[0] : "U",
-      wallet: role.startsWith("client") ? 100000 : 0,
+      wallet: roleGroup(role) === "client" ? 100000 : 0,
       ...(role === "client_business" ? { company: form.company || "", taxId: form.taxId || "" } : {}),
       ...(role === "engineer"
         ? {
@@ -1170,15 +1517,41 @@ const AuthScreen = () => {
   };
 
   const handleLogin = () => {
-    const success = login(form.email, form.password);
-    if (!success) addToast("帳號或密碼錯誤", "error");
-    else addToast("登入成功", "success");
+    const email = String(form.email || "").trim();
+    const password = String(form.password || "").trim();
+    if (!email || !password) {
+      addToast("請輸入帳號與密碼", "error");
+      return;
+    }
+    setIsLoggingIn(true);
+    try {
+      const success = login(email, password, role || undefined);
+      if (!success) addToast("帳號或密碼錯誤，請確認資料是否正確", "error");
+      else addToast("登入成功", "success");
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   const quickLogin = (type) => {
-    if (type === "client") login("client", "123");
-    if (type === "tech") login("tech", "123");
-    if (type === "admin") login("admin", "123");
+    if (type === "client") {
+      setRole("client_personal");
+      setView("login");
+      setForm((prev) => ({ ...prev, email: "client", password: "123" }));
+      login("client", "123");
+    }
+    if (type === "tech") {
+      setRole("engineer");
+      setView("login");
+      setForm((prev) => ({ ...prev, email: "tech", password: "123" }));
+      login("tech", "123");
+    }
+    if (type === "admin") {
+      setRole("admin");
+      setView("login");
+      setForm((prev) => ({ ...prev, email: "admin", password: "123" }));
+      login("admin", "123");
+    }
   };
 
   if (view === "landing")
@@ -1244,8 +1617,11 @@ const AuthScreen = () => {
           <input className="input-modern" placeholder="Email / 帳號" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <input className="input-modern" type="password" placeholder="密碼" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
 
-          <button onClick={() => (view === "login" ? handleLogin() : handleRegister())} className="w-full btn btn-primary px-4 py-3 rounded-xl font-bold shadow-lg">
-            {view === "login" ? "登入" : "提交註冊"}
+          <button
+            onClick={() => (view === "login" ? handleLogin() : handleRegister())}
+            className={`w-full btn btn-primary px-4 py-3 rounded-xl font-bold shadow-lg ${isLoggingIn ? "opacity-70 pointer-events-none" : ""}`}
+          >
+            {view === "login" ? (isLoggingIn ? "登入中..." : "登入") : "提交註冊"}
           </button>
         </div>
 
@@ -1441,7 +1817,7 @@ const ClientCreateJob = ({ onClose }) => {
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="text-xs font-bold text-slate-500 mb-2 block">工程類別</label>
-            <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
               {PROJECT_CATEGORIES.map((cat) => (
                 <button key={cat.id} onClick={() => setForm({ ...form, type: cat.label, items: {} })} className={`category-btn ${form.type === cat.label ? "active" : "inactive"}`}>
                   <Icon name={cat.icon} size={24} className="mb-1" /> <span className="text-[10px] font-bold">{cat.label}</span>
@@ -1614,7 +1990,7 @@ const CallModal = ({ name, phone, onClose, addToast }) => {
   );
 };
 
-const ChatModal = ({ job, me, peer, onUpdate, onClose }) => {
+const ChatModal = ({ job, me, peer, onUpdate, onClose, onBack }) => {
   const [draft, setDraft] = useState("");
   const listRef = React.useRef(null);
 
@@ -1643,7 +2019,7 @@ const ChatModal = ({ job, me, peer, onUpdate, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[175] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
+    <div className="fixed inset-0 z-[190] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
       <div className="bg-white w-full max-w-2xl md:rounded-3xl rounded-t-3xl h-[85vh] md:h-[75vh] shadow-2xl overflow-hidden flex flex-col">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -1653,7 +2029,14 @@ const ChatModal = ({ job, me, peer, onUpdate, onClose }) => {
               <p className="text-xs text-slate-400">{peer?.name || "對方"} · {job.title}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+          <div className="flex items-center gap-2">
+            {onBack && (
+              <button onClick={onBack} className="px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold hover:bg-indigo-100">
+                返回列表
+              </button>
+            )}
+            <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+          </div>
         </div>
 
         <div ref={listRef} className="flex-1 overflow-y-auto p-6 space-y-3 bg-slate-50">
@@ -1684,6 +2067,8 @@ const ChatModal = ({ job, me, peer, onUpdate, onClose }) => {
 
 const ConversationsModal = ({ me, onClose, onOpen }) => {
   const { jobs, users } = useApp();
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const relevant = me?.role === "engineer"
     ? jobs.filter((j) => j.assignee === me.id)
@@ -1698,10 +2083,27 @@ const ConversationsModal = ({ me, onClose, onOpen }) => {
       const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
       const lastTs = last?.ts || j.created_at || "";
       const preview = last?.text ? String(last.text).slice(0, 40) : "尚無訊息";
-      return { job: j, peer, lastTs, preview };
+      return { job: j, peer, lastTs, preview, msgCount: msgs.length };
     })
     .filter((r) => Boolean(r.peer))
     .sort((a, b) => String(b.lastTs).localeCompare(String(a.lastTs)));
+  const counts = rows.reduce((acc, r) => {
+    acc.all += 1;
+    acc[r.job.status] = (acc[r.job.status] || 0) + 1;
+    return acc;
+  }, { all: 0, open: 0, active: 0, completed: 0, closed: 0 });
+  const filteredRows = rows.filter((r) => {
+    const haystack = [
+      r.peer?.name,
+      r.job.title,
+      r.preview,
+      getStatusProgress(r.job.status).label,
+      roleLabel(r.peer?.role),
+    ].join(" ").toLowerCase();
+    const matchesQuery = !query.trim() || haystack.includes(query.trim().toLowerCase());
+    const matchesStatus = statusFilter === "all" || r.job.status === statusFilter;
+    return matchesQuery && matchesStatus;
+  });
 
   return (
     <div className="fixed inset-0 z-[176] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
@@ -1717,14 +2119,59 @@ const ConversationsModal = ({ me, onClose, onOpen }) => {
           <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
         </div>
 
-        <div className="p-4 overflow-y-auto flex-1 bg-slate-50">
-          {rows.length === 0 ? (
+        <div className="p-4 overflow-y-auto flex-1 bg-slate-50 space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">對話總數</div>
+              <div className="text-xl font-bold text-slate-900 font-num">{counts.all}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">施工中</div>
+              <div className="text-xl font-bold text-indigo-700 font-num">{counts.active}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">待驗收</div>
+              <div className="text-xl font-bold text-amber-600 font-num">{counts.completed}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">已完成</div>
+              <div className="text-xl font-bold text-emerald-600 font-num">{counts.closed}</div>
+            </div>
+          </div>
+
+          <div className="card-modern p-4 space-y-3">
+            <input
+              className="input-modern"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="搜尋客戶、工程師、案件標題、訊息內容"
+            />
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: "all", label: `全部 (${counts.all})` },
+                { id: "open", label: `媒合中 (${counts.open || 0})` },
+                { id: "active", label: `施工中 (${counts.active || 0})` },
+                { id: "completed", label: `待驗收 (${counts.completed || 0})` },
+                { id: "closed", label: `已完成 (${counts.closed || 0})` },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setStatusFilter(item.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${statusFilter === item.id ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filteredRows.length === 0 ? (
             <div className="p-6 text-center text-sm text-slate-400 bg-white border border-slate-200 rounded-2xl">
               目前沒有可開啟的對話 (需要已媒合的案件)
             </div>
           ) : (
             <div className="space-y-3">
-              {rows.map((r) => (
+              {filteredRows.map((r) => (
                 <button
                   key={r.job.id}
                   onClick={() => onOpen(r.job)}
@@ -1734,6 +2181,11 @@ const ConversationsModal = ({ me, onClose, onOpen }) => {
                     <div className="min-w-0">
                       <div className="text-sm font-bold text-slate-900 truncate">{r.peer?.name || "對方"} · {r.job.title}</div>
                       <div className="text-xs text-slate-500 mt-1 truncate">{r.preview}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px]">
+                        <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-600 font-bold">{roleLabel(r.peer?.role)}</span>
+                        <span className="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 font-bold">{getStatusProgress(r.job.status).label}</span>
+                        <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-700 font-bold">訊息 {r.msgCount}</span>
+                      </div>
                     </div>
                     <div className="text-[10px] text-slate-400 font-num shrink-0">{r.lastTs ? new Date(r.lastTs).toLocaleString() : ""}</div>
                   </div>
@@ -1751,7 +2203,7 @@ const ConversationsModal = ({ me, onClose, onOpen }) => {
   );
 };
 
-const ProjectDetail = ({ job, user, onClose, onUpdate, addToast }) => {
+const ProjectDetail = ({ job, user, onClose, onUpdate, addToast, initialAcceptanceFlag = false, focusAcceptance = false, focusSupplement = false }) => {
   const isEng = user.role === "engineer";
   const { users, updateUser } = useApp();
 
@@ -1760,6 +2212,8 @@ const ProjectDetail = ({ job, user, onClose, onUpdate, addToast }) => {
   
   const peerUser = isEng ? users.find((u) => u.id === job.clientId) : users.find((u) => u.id === job.assignee);
   const peerPhone = peerUser?.phone || "";
+  const acceptanceSectionRef = useRef(null);
+  const supplementSectionRef = useRef(null);
 
   const [showChat, setShowChat] = useState(false);
   const [showCall, setShowCall] = useState(false);
@@ -1772,6 +2226,9 @@ const total = calcJobTotal(job);
     0
   );
   const evidenceOk = jobPhotos.length > 0 && Boolean(job.signature);
+  const jobRisk = getJobRiskState(job);
+  const jobAgeDays = getJobAgeDays(job);
+  const jobNextAction = getJobNextAction(job);
 
   const [materials, setMaterials] = useState(job.materials || []);
   const [photos, setPhotos] = useState(job.photos || []);
@@ -1783,7 +2240,15 @@ const total = calcJobTotal(job);
   const [signature, setSignature] = useState(job.signature || null);
   const [acceptChecked, setAcceptChecked] = useState(false);
   const [acceptanceNote, setAcceptanceNote] = useState(job.acceptanceNote || "");
-  const [acceptanceFlag, setAcceptanceFlag] = useState(Boolean(job.acceptanceFlag));
+  const [acceptanceFlag, setAcceptanceFlag] = useState(Boolean(job.acceptanceFlag || initialAcceptanceFlag));
+  const [supplementNote, setSupplementNote] = useState(job.supplementNote || "");
+  const [supplementPhotos, setSupplementPhotos] = useState(Array.isArray(job.supplementPhotos) ? job.supplementPhotos : []);
+  const [supplementPhotoMeta, setSupplementPhotoMeta] = useState(
+    Array.isArray(job.supplementPhotoMeta) && job.supplementPhotoMeta.length > 0
+      ? job.supplementPhotoMeta
+      : (Array.isArray(job.supplementPhotos) ? job.supplementPhotos.map(() => ({ note: "", mark: "" })) : [])
+  );
+  const [supplementAt, setSupplementAt] = useState(job.supplementAt || null);
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
   const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
   const [photoViewerList, setPhotoViewerList] = useState([]);
@@ -1792,6 +2257,19 @@ const total = calcJobTotal(job);
 
   const [showCustomMat, setShowCustomMat] = useState(false);
   const [customMat, setCustomMat] = useState({ name: "", unit: "式", price: "", qty: 1 });
+
+  useEffect(() => {
+    if (focusAcceptance && acceptanceSectionRef.current) {
+      acceptanceSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [focusAcceptance]);
+
+  useEffect(() => {
+    if (focusSupplement && supplementSectionRef.current) {
+      supplementSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [focusSupplement]);
+
   const openMaps = () => {
     if (!job.address) return;
     const w = window.open(mapsUrlForAddress(job.address), "_blank", "noopener,noreferrer");
@@ -1909,18 +2387,31 @@ const total = calcJobTotal(job);
     setShowCustomMat(false);
   };
 
-  const handlePhoto = (e) => {
+  const handlePhoto = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
+    const remainingSlots = Math.max(0, 4 - photos.length);
+    if (remainingSlots === 0) {
+      addToast("完工照片最多 4 張，請先刪除舊照片再上傳", "error");
+      e.target.value = "";
+      return;
+    }
 
-    files.forEach((file) => {
-      const r = new FileReader();
-      r.onload = (v) => {
-        setPhotos((prev) => [...prev, v.target.result]);
+    for (const file of files.slice(0, remainingSlots)) {
+      try {
+        if ((Number(file.size) || 0) > 8 * 1024 * 1024) {
+          addToast("圖片過大，請選擇 8MB 以下檔案", "error");
+          continue;
+        }
+        const imageDataUrl = await compressImageFile(file);
+        setPhotos((prev) => [...prev, imageDataUrl]);
         setPhotoMeta((prev) => [...prev, { note: "", mark: "" }]);
-      };
-      r.readAsDataURL(file);
-    });
+      } catch (error) {
+        addToast("圖片處理失敗，請改用較小檔案", "error");
+      }
+    }
+
+    e.target.value = "";
   };
 
   const removePhoto = (idx) => {
@@ -1943,22 +2434,23 @@ const total = calcJobTotal(job);
   const materialSum = materials.reduce((acc, m) => acc + (Number(m.price) || 0) * (Number(m.qty) || 0), 0);
 
   const submit = () => {
-    if (!job.techArrived) {
-      addToast("請先抵達打卡，再送出報告", "error");
-      return;
-    }
-    if (photos.length === 0) {
-      addToast("請至少上傳 1 張完工照片", "error");
-      return;
-    }
-    if (!signature) {
-      addToast("請先完成客戶簽名", "error");
-      return;
-    }
-    if (photoMeta.length !== photos.length) {
-      addToast("照片說明/點位數量不一致，請檢查", "error");
-      return;
-    }
+    try {
+      if (!job.techArrived) {
+        addToast("請先抵達打卡，再送出報告", "error");
+        return;
+      }
+      if (photos.length === 0) {
+        addToast("請至少上傳 1 張完工照片", "error");
+        return;
+      }
+      if (!signature) {
+        addToast("請先完成客戶簽名", "error");
+        return;
+      }
+      if (photoMeta.length !== photos.length) {
+        addToast("照片說明/點位數量不一致，請檢查", "error");
+        return;
+      }
 
       onUpdate({
         ...job,
@@ -1970,8 +2462,12 @@ const total = calcJobTotal(job);
         reportSubmittedAt: new Date().toISOString(),
         materialSum,
       });
-    addToast("報告送出，等待客戶驗收", "success");
-    onClose();
+      addToast("報告送出，等待客戶驗收", "success");
+      onClose();
+    } catch (error) {
+      console.error(error);
+      addToast("送出失敗，請重新整理後再試", "error");
+    }
   };
 
   const canSubmit = Boolean(job.techArrived) && photos.length > 0 && Boolean(signature);
@@ -2026,7 +2522,7 @@ const total = calcJobTotal(job);
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 pb-32 space-y-6">
-          {(job.assignee || user.role.startsWith("client")) && (
+          {(job.assignee || roleGroup(user.role) === "client") && (
             <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={() => (peerUser ? setShowCall(true) : addToast("尚未媒合技師，暫無法通話", "error"))}
@@ -2126,8 +2622,14 @@ const total = calcJobTotal(job);
                   </div>
                 )}
 
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4" ref={acceptanceSectionRef}>
                   <div className="text-xs font-bold text-slate-500 mb-2">驗收狀況</div>
+                  {job.status === "completed" && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      <button type="button" onClick={() => { setAcceptChecked(true); setAcceptanceFlag(false); addToast("已切換為正常驗收", "success"); }} className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold">正常驗收</button>
+                      <button type="button" onClick={() => { setAcceptChecked(true); setAcceptanceFlag(true); addToast("請填寫異常/補件說明", "warning"); }} className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 text-xs font-bold">回報異常 / 需補件</button>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className={`px-3 py-2 rounded-lg ${jobPhotos.length > 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
                       完工照片 {jobPhotos.length > 0 ? "已上傳" : "缺少"}
@@ -2169,6 +2671,53 @@ const total = calcJobTotal(job);
                 </div>
               </div>
             )}
+
+          {isEng && (job.auditStatus === "needs_fix" || job.supplementAt) && (
+            <div ref={supplementSectionRef} className="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm space-y-4">
+              <h4 className="font-bold text-slate-800 flex items-center gap-2"><Icon name="badge-alert" /> 補件回報</h4>
+              <div className="text-xs text-slate-500">管理端要求補件時，工程師在這裡補充說明、照片與點位。</div>
+              <div className="grid grid-cols-1 gap-3">
+                <textarea className="input-modern h-24 resize-none" placeholder="補件說明 / 已修正內容" value={supplementNote} onChange={(e) => setSupplementNote(e.target.value)} />
+                <div className="flex items-center gap-3">
+                  <label className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold cursor-pointer hover:bg-slate-800">
+                    + 上傳補件照片
+                    <input type="file" className="hidden" accept="image/*" capture="environment" multiple onChange={handleSupplementPhoto} />
+                  </label>
+                  <div className="text-xs text-slate-400">最多 4 張，請拍清楚修正點位</div>
+                </div>
+                {supplementPhotos.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                      {supplementPhotos.map((p, i) => (
+                        <div key={i} className="w-24 shrink-0">
+                          <button onClick={() => openPhotoViewer(supplementPhotos, i, supplementPhotoMeta)} className="w-24 h-24 rounded-xl overflow-hidden border">
+                            <img src={p} className="w-24 h-24 object-cover" />
+                          </button>
+                          <button type="button" onClick={() => removeSupplementPhoto(i)} className="mt-1 w-full text-[10px] font-bold text-rose-600 hover:underline">移除</button>
+                          <div className="mt-1 space-y-1">
+                            <input className="input-modern py-1.5 text-xs" placeholder="說明" value={supplementPhotoMeta[i]?.note || ""} onChange={(e) => updateSupplementPhotoMeta(i, { note: e.target.value })} />
+                            <input className="input-modern py-1.5 text-xs" placeholder="點位" value={supplementPhotoMeta[i]?.mark || ""} onChange={(e) => updateSupplementPhotoMeta(i, { mark: e.target.value })} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-col md:flex-row gap-2">
+                  <button onClick={submitSupplement} className="flex-1 btn btn-primary py-3">送出補件回報</button>
+                  <button onClick={() => { setSupplementNote(""); setSupplementPhotos([]); setSupplementPhotoMeta([]); }} className="flex-1 btn btn-outline py-3">清空補件內容</button>
+                </div>
+                {(job.supplementAt || supplementAt) && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs text-slate-600">
+                    <div className="font-bold text-slate-700 mb-1">最近補件</div>
+                    <div>時間：{(job.supplementAt || supplementAt) ? new Date(job.supplementAt || supplementAt).toLocaleString() : "-"}</div>
+                    <div>補件人：{getUserName(job.supplementBy, job.supplementBy) || user.name || "-"}</div>
+                    <div className="mt-1">說明：{job.supplementNote || supplementNote || "無"}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {isEng && job.status === "active" && (
             <div className="space-y-6">
@@ -2364,35 +2913,75 @@ const ClientView = ({ user }) => {
   const [showProfile, setShowProfile] = useState(false);
   const [nav, setNav] = useState("jobs");
   const [infoTab, setInfoTab] = useState("contact");
+  const [jobTab, setJobTab] = useState("all");
+  const [jobActionMode, setJobActionMode] = useState(null);
 
 
   const myJobs = jobs.filter((j) => j.clientId === user.id);
-  const paymentRecords = useMemo(() => {
+  const visibleJobs = useMemo(() => {
+    if (jobTab === "all") return myJobs;
+    return myJobs.filter((j) => j.status === jobTab);
+  }, [jobTab, myJobs]);
+  const openJobs = useMemo(() => myJobs.filter((j) => j.status === "open"), [myJobs]);
+  const activeJobs = useMemo(() => myJobs.filter((j) => j.status === "active"), [myJobs]);
+  const pendingAcceptJobs = useMemo(() => myJobs.filter((j) => j.status === "completed"), [myJobs]);
+  const closedJobs = useMemo(() => myJobs.filter((j) => j.status === "closed"), [myJobs]);
+  const overdueJobs = useMemo(() => myJobs.filter((j) => getJobRiskState(j).tone === "danger"), [myJobs]);
+  const billingRecords = useMemo(() => {
     const records = [];
     myJobs.forEach((j) => {
       const total = calcJobTotal(j);
       const dep = Number(j.depositAmount) || calcDeposit(total);
-      const tail = Number(j.tailAmount) || (total - dep);
+      const tail = Number(j.tailAmount) || calcTail(total);
+      const depositPaid = Boolean(j.deposit_paid);
+      const tailPaid = Boolean(j.tail_paid || j.paidAt);
+      const tailDue = j.status === "completed" || j.status === "closed";
       records.push({
-        id: `${j.id}-dep`,
-        type: "訂金",
-        amount: dep,
-        at: j.created_at,
+        id: `${j.id}-deposit`,
+        jobId: j.id,
         title: j.title,
+        stage: "訂金",
+        amount: dep,
+        paid: depositPaid,
+        due: !depositPaid,
+        status: depositPaid ? "已付" : "未付",
+        at: depositPaid ? j.created_at : null,
       });
-      if (j.paidAt) {
-        records.push({
-          id: `${j.id}-tail`,
-          type: "尾款",
-          amount: tail,
-          at: j.paidAt,
-          title: j.title,
-        });
-      }
+      records.push({
+        id: `${j.id}-tail`,
+        jobId: j.id,
+        title: j.title,
+        stage: "尾款",
+        amount: tail,
+        paid: tailPaid,
+        due: tailDue && !tailPaid,
+        status: tailPaid ? "已付" : (tailDue ? "未付" : "未到期"),
+        at: tailPaid ? (j.paidAt || j.reportSubmittedAt || j.updated_at || j.created_at || null) : null,
+      });
     });
-    return records.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+    return records.sort((a, b) => {
+      const atA = a.at ? new Date(a.at).getTime() : -1;
+      const atB = b.at ? new Date(b.at).getTime() : -1;
+      return atB - atA;
+    });
   }, [myJobs]);
-  const paidTotal = paymentRecords.reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
+  const contractTotal = useMemo(() => myJobs.reduce((acc, j) => acc + calcJobTotal(j), 0), [myJobs]);
+  const depositPaidTotal = useMemo(() => billingRecords.filter((r) => r.stage === "訂金" && r.paid).reduce((acc, r) => acc + (Number(r.amount) || 0), 0), [billingRecords]);
+  const tailPaidTotal = useMemo(() => billingRecords.filter((r) => r.stage === "尾款" && r.paid).reduce((acc, r) => acc + (Number(r.amount) || 0), 0), [billingRecords]);
+  const depositDueTotal = useMemo(() => billingRecords.filter((r) => r.stage === "訂金" && r.due).reduce((acc, r) => acc + (Number(r.amount) || 0), 0), [billingRecords]);
+  const tailDueTotal = useMemo(() => billingRecords.filter((r) => r.stage === "尾款" && r.due).reduce((acc, r) => acc + (Number(r.amount) || 0), 0), [billingRecords]);
+  const paidTotal = depositPaidTotal + tailPaidTotal;
+  const unpaidTotal = depositDueTotal + tailDueTotal;
+  const pendingPaymentJobs = useMemo(() => myJobs.filter((j) => !j.deposit_paid || (j.status === "completed" || (j.status === "closed" && !j.tail_paid))), [myJobs]);
+  const engineeringRecords = useMemo(() => [...myJobs].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()), [myJobs]);
+
+  const jobTabs = [
+    { id: "all", label: "全部", count: myJobs.length },
+    { id: "open", label: "媒合中", count: myJobs.filter((j) => j.status === "open").length },
+    { id: "active", label: "施工中", count: myJobs.filter((j) => j.status === "active").length },
+    { id: "completed", label: "待驗收", count: myJobs.filter((j) => j.status === "completed").length },
+    { id: "closed", label: "已完成", count: myJobs.filter((j) => j.status === "closed").length },
+  ];
 
   return (
     <div className="min-h-screen pb-32">
@@ -2400,9 +2989,11 @@ const ClientView = ({ user }) => {
         <ProjectDetail
           job={selectedJob}
           user={user}
-          onClose={() => setSelectedJob(null)}
+          onClose={() => { setSelectedJob(null); setJobActionMode(null); }}
           onUpdate={(u) => { setJobs((prev) => prev.map((j) => (j.id === u.id ? normalizeJob(u) : j))); setSelectedJob(normalizeJob(u)); }}
           addToast={addToast}
+          initialAcceptanceFlag={jobActionMode === "issue"}
+          focusAcceptance={jobActionMode === "issue" || jobActionMode === "pay"}
         />
       )}
       {editJob && (
@@ -2421,7 +3012,7 @@ const ClientView = ({ user }) => {
         <ConversationsModal
           me={user}
           onClose={() => { setShowInbox(false); setNav("jobs"); }}
-          onOpen={(j) => { setChatJob(normalizeJob(j)); setShowInbox(false); }}
+          onOpen={(j) => { setChatJob(normalizeJob(j)); }}
         />
       )}
 
@@ -2435,11 +3026,13 @@ const ClientView = ({ user }) => {
             setChatJob(normalizeJob(u));
             setSelectedJob((prev) => (prev && prev.id === u.id ? normalizeJob(u) : prev));
           }}
-          onClose={() => { setChatJob(null); setNav("jobs"); }}
+          onBack={() => setChatJob(null)}
+          onClose={() => { setChatJob(null); setShowInbox(false); setNav("jobs"); }}
         />
       )}
 
       {showProfile && <ProfileModal user={user} onClose={() => { setShowProfile(false); setNav("jobs"); }} />}
+      <div className="mx-auto max-w-3xl px-4 pt-4">
       <div className="p-6 pt-12 pb-20 bg-indigo-600 text-white rounded-b-[2.5rem] shadow-xl shadow-indigo-200 mb-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-12 opacity-10"><Icon name="zap" size={120} /></div>
         <div className="flex justify-between items-center mb-6 relative z-10">
@@ -2454,22 +3047,83 @@ const ClientView = ({ user }) => {
           發布新需求
         </button>
       </div>
+      <div className="card-modern p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-bold text-slate-800">付款與工程摘要</div>
+          <button onClick={() => setInfoTab("payments")} className="text-xs font-bold text-indigo-600 hover:underline">查看付款明細</button>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+            <div className="text-xs text-slate-400">應付總額</div>
+            <div className="text-xl font-bold text-slate-900 font-num">{formatCurrency(contractTotal)}</div>
+          </div>
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+            <div className="text-xs text-slate-400">已付總額</div>
+            <div className="text-xl font-bold text-emerald-600 font-num">{formatCurrency(paidTotal)}</div>
+          </div>
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+            <div className="text-xs text-slate-400">未付總額</div>
+            <div className="text-xl font-bold text-amber-600 font-num">{formatCurrency(unpaidTotal)}</div>
+          </div>
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+            <div className="text-xs text-slate-400">待驗收案件</div>
+            <div className="text-xl font-bold text-indigo-700 font-num">{pendingAcceptJobs.length}</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 text-sm text-slate-600">
+          <div>待付訂金：{formatCurrency(depositDueTotal)}</div>
+          <div>待付尾款：{formatCurrency(tailDueTotal)}</div>
+          <div>已完成案件：{closedJobs.length}</div>
+        </div>
+        <div className="mt-3 bg-white border border-slate-200 rounded-2xl p-4">
+          <div className="text-xs font-bold text-slate-500 mb-2">近期工程記錄</div>
+          {closedJobs.length === 0 ? (
+            <div className="text-xs text-slate-400">尚無已結案案件</div>
+          ) : (
+            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+              {closedJobs.slice(0, 8).map((j) => {
+                const total = calcJobTotal(j);
+                const dep = Number(j.depositAmount) || calcDeposit(total);
+                const tail = Number(j.tailAmount) || (total - dep);
+                return (
+                  <div key={j.id} className="flex items-center justify-between text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-800 truncate">{j.title}</div>
+                      <div className="text-slate-400 mt-1">{j.paidAt ? new Date(j.paidAt).toLocaleDateString() : "-"}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-indigo-700 font-num">{formatCurrency(total)}</div>
+                      <div className="text-[10px] text-slate-400">尾款 {formatCurrency(tail)}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
-      <div className="px-6 space-y-4">
+      <div className="mx-auto max-w-3xl px-4 space-y-4">
         <div className="card-modern p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="font-bold text-slate-800">我的資訊</div>
             <button onClick={() => setShowProfile(true)} className="text-xs font-bold text-indigo-600 hover:underline">編輯</button>
           </div>
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
             <button onClick={() => setInfoTab("contact")} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${infoTab === "contact" ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}>
               聯絡資訊
             </button>
             <button onClick={() => setInfoTab("company")} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${infoTab === "company" ? "bg-slate-50 text-slate-700 border-slate-200" : "bg-white text-slate-600 border-slate-200"}`}>
               公司資訊
             </button>
-            <button onClick={() => setInfoTab("cash")} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${infoTab === "cash" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-white text-slate-600 border-slate-200"}`}>
+            <button onClick={() => setInfoTab("finance")} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${infoTab === "finance" ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}>
+              帳務摘要
+            </button>
+            <button onClick={() => setInfoTab("payments")} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${infoTab === "payments" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-white text-slate-600 border-slate-200"}`}>
               付款紀錄
+            </button>
+            <button onClick={() => setInfoTab("records")} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${infoTab === "records" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-white text-slate-600 border-slate-200"}`}>
+              工程紀錄
             </button>
           </div>
           {infoTab === "contact" && (
@@ -2489,48 +3143,147 @@ const ClientView = ({ user }) => {
               <div><span className="text-xs text-slate-400 block">公司地址</span>{user.companyAddress || "-"}</div>
             </div>
           )}
-          {infoTab === "cash" && (
+          {infoTab === "finance" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600">
+              <div><span className="text-xs text-slate-400 block">工程總額</span>{formatCurrency(contractTotal)}</div>
+              <div><span className="text-xs text-slate-400 block">已付總額</span>{formatCurrency(paidTotal)}</div>
+              <div><span className="text-xs text-slate-400 block">未付總額</span>{formatCurrency(unpaidTotal)}</div>
+              <div><span className="text-xs text-slate-400 block">待付訂金</span>{formatCurrency(depositDueTotal)}</div>
+              <div><span className="text-xs text-slate-400 block">待付尾款</span>{formatCurrency(tailDueTotal)}</div>
+              <div><span className="text-xs text-slate-400 block">完成案件</span>{closedJobs.length}</div>
+            </div>
+          )}
+          {infoTab === "payments" && (
             <div className="space-y-2">
-              {paymentRecords.length === 0 ? (
+              {billingRecords.length === 0 ? (
                 <div className="text-xs text-slate-400">尚無付款紀錄</div>
               ) : (
                 <div className="space-y-2">
-                  {paymentRecords.slice(0, 6).map((r) => (
+                  {billingRecords.slice(0, 8).map((r) => (
                     <div key={r.id} className="flex items-center justify-between text-xs bg-white border border-slate-200 rounded-lg px-3 py-2">
                       <div>
-                        <div className="font-bold">{r.type} · {r.title}</div>
-                        <div className="text-slate-400">{r.at ? new Date(r.at).toLocaleString() : "-"}</div>
+                        <div className="font-bold">{r.stage} · {r.title}</div>
+                        <div className="text-slate-400">{r.at ? new Date(r.at).toLocaleString() : "待付款"}</div>
                       </div>
-                      <div className="font-bold text-slate-800 font-num">{formatCurrency(r.amount)}</div>
+                      <div className="text-right">
+                        <div className={`font-bold font-num ${r.paid ? "text-emerald-600" : "text-amber-600"}`}>{formatCurrency(r.amount)}</div>
+                        <div className="text-[10px] text-slate-400">{r.status}</div>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
-              <div className="text-xs text-slate-400">累計 {formatCurrency(paidTotal)}</div>
+              <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+                <div>訂金已付：{formatCurrency(depositPaidTotal)}</div>
+                <div>尾款已付：{formatCurrency(tailPaidTotal)}</div>
+              </div>
+            </div>
+          )}
+          {infoTab === "records" && (
+            <div className="space-y-2">
+              {engineeringRecords.length === 0 ? (
+                <div className="text-xs text-slate-400">尚無工程紀錄</div>
+              ) : (
+                engineeringRecords.slice(0, 8).map((j) => {
+                  const total = calcJobTotal(j);
+                  const dep = Number(j.depositAmount) || calcDeposit(total);
+                  const tail = Number(j.tailAmount) || calcTail(total);
+                  const paymentState = j.status === "closed"
+                    ? (j.tail_paid ? "已結清" : "待確認尾款")
+                    : (j.status === "completed"
+                      ? (j.tail_paid ? "待驗收已備妥" : "待驗收 / 尾款待收")
+                      : (j.deposit_paid ? "訂金已收" : "訂金待收"));
+                  return (
+                    <button key={j.id} type="button" onClick={() => setSelectedJob(j)} className="w-full text-left flex items-center justify-between text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 hover:bg-slate-50">
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-800 truncate">{j.title}</div>
+                        <div className="text-slate-400 mt-1">{new Date(j.created_at).toLocaleDateString()} · {getStatusProgress(j.status).label}</div>
+                        <div className="text-[10px] text-slate-500 mt-1">進度：{getJobNextAction(j)} · {paymentState}</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-bold text-indigo-700 font-num">{formatCurrency(total)}</div>
+                        <div className="text-[10px] text-slate-400">D {formatCurrency(dep)} / T {formatCurrency(tail)}</div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
           )}
         </div>
 
-        <h3 className="font-bold text-slate-800">進行中案件</h3>
-        {myJobs.map((j) => (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="card-modern p-4">
+            <div className="text-xs text-slate-400">媒合中</div>
+            <div className="text-xl font-bold text-indigo-700 font-num">{openJobs.length}</div>
+          </div>
+          <div className="card-modern p-4">
+            <div className="text-xs text-slate-400">施工中</div>
+            <div className="text-xl font-bold text-blue-700 font-num">{activeJobs.length}</div>
+          </div>
+          <div className="card-modern p-4">
+            <div className="text-xs text-slate-400">待驗收</div>
+            <div className="text-xl font-bold text-amber-600 font-num">{pendingAcceptJobs.length}</div>
+          </div>
+          <div className="card-modern p-4">
+            <div className="text-xs text-slate-400">逾期案件</div>
+            <div className="text-xl font-bold text-rose-600 font-num">{overdueJobs.length}</div>
+          </div>
+        </div>
+
+        <div className="card-modern p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-slate-800">案件分類</h3>
+            <span className="text-xs text-slate-400">依狀態快速切換</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            {jobTabs.map((t) => (
+              <button key={t.id} onClick={() => setJobTab(t.id)} className={`px-3 py-1.5 rounded-xl border text-xs font-bold whitespace-nowrap ${jobTab === t.id ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}>
+                {t.label} {t.count}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <h3 className="font-bold text-slate-800">{JOB_STATUS_LABEL[jobTab] ? `${JOB_STATUS_LABEL[jobTab]}案件` : "全部案件"}</h3>
+        {visibleJobs.map((j) => (
           <div key={j.id} onClick={() => setSelectedJob(j)} className="card-modern p-5 cursor-pointer">
             <div className="flex justify-between mb-2"><span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold">{getStatusProgress(j.status).label}</span></div>
             <h4 className="font-bold text-lg text-slate-800 mb-1">{j.title}</h4>
+            <div className="text-xs text-slate-500 mb-2 flex flex-wrap gap-2">
+              <span>下一步：{getJobNextAction(j)}</span>
+              <span>·</span>
+              <span>年齡 {getJobAgeDays(j)} 天</span>
+              {getJobRiskState(j).tone === "danger" && <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold">逾期</span>}
+            </div>
             <div className="flex justify-between text-xs text-slate-400 font-num"><span>{new Date(j.created_at).toLocaleDateString()}</span><span className="font-bold text-slate-800">${(j.laborBudget + j.materialBudget).toLocaleString()}</span></div>
             <div className="mt-3">
               <StatusProgress status={j.status} />
             </div>
             <div className="mt-2 text-xs text-slate-500">
               施工地址：{j.address || "-"}
+              <span className="block mt-1">聯絡窗口：{j.status === "closed" ? "已結案" : getUserName(j.assignee) || "待指派"}</span>
+              <span className="block mt-1">付款狀態：{j.deposit_paid ? "訂金已付" : "訂金待付"} / {j.tail_paid || j.paidAt ? "尾款已付" : (j.status === "completed" || j.status === "closed" ? "尾款待付" : "尾款未到期")}</span>
             </div>
+            {pendingPaymentJobs.includes(j) && (
+              <div className="mt-3 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                此案件仍有付款/驗收待處理
+              </div>
+            )}
             {j.status === "open" && (
               <div className="mt-3 flex gap-2">
                 <button onClick={(e) => { e.stopPropagation(); setEditJob(j); }} className="btn btn-outline px-3 py-2 rounded-xl">編輯案件</button>
               </div>
             )}
+            {j.status === "completed" && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button onClick={(e) => { e.stopPropagation(); setSelectedJob(j); setJobActionMode("pay"); }} className="btn btn-primary px-3 py-2 rounded-xl">驗收付款</button>
+                <button onClick={(e) => { e.stopPropagation(); setSelectedJob(j); setJobActionMode("issue"); }} className="btn btn-danger px-3 py-2 rounded-xl">回報異常 / 需補件</button>
+              </div>
+            )}
           </div>
         ))}
-        {myJobs.length === 0 && <div className="text-sm text-slate-400">目前沒有案件，點上方按鈕可以快速發案。</div>}
+        {visibleJobs.length === 0 && <div className="text-sm text-slate-400">目前沒有符合條件的案件。</div>}
       </div>
       <BottomNav
         active={nav}
@@ -2562,8 +3315,8 @@ const ClientView = ({ user }) => {
           { id: "me", label: "我的", icon: "user" },
         ]}
       />
-
-</div>
+      </div>
+    </div>
   );
 };
 
@@ -2572,11 +3325,24 @@ const WalletModal = ({ user, pendingTail, onWithdraw, onClose }) => {
   const { withdrawals } = useApp();
   const wallet = Number(user.wallet) || 0;
   const myWithdrawals = withdrawals.filter((w) => w.userId === user.id);
-  const statusLabel = (s) => (s === "approved" ? "已通過" : s === "rejected" ? "已拒絕" : "待審核");
+  const [selectedWithdrawal, setSelectedWithdrawal] = useState(myWithdrawals[0] || null);
+
+  useEffect(() => {
+    setSelectedWithdrawal((current) => {
+      if (current && myWithdrawals.some((w) => w.id === current.id)) return myWithdrawals.find((w) => w.id === current.id) || null;
+      return myWithdrawals[0] || null;
+    });
+  }, [myWithdrawals]);
+
+  const selected = selectedWithdrawal ? myWithdrawals.find((w) => w.id === selectedWithdrawal.id) || selectedWithdrawal : null;
+  const submittedTotal = myWithdrawals.reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+  const pendingTotal = myWithdrawals.filter((w) => w.status === "pending").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+  const approvedTotal = myWithdrawals.filter((w) => w.status === "approved").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+  const paidTotal = myWithdrawals.filter((w) => w.status === "paid").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
 
   return (
     <div className="fixed inset-0 z-[180] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
-      <div className="bg-white w-full max-w-lg md:rounded-3xl rounded-t-3xl h-[80vh] md:h-[70vh] shadow-2xl overflow-hidden flex flex-col">
+      <div className="bg-white w-full max-w-2xl md:rounded-3xl rounded-t-3xl h-[88vh] md:h-[80vh] shadow-2xl overflow-hidden flex flex-col">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -2591,10 +3357,46 @@ const WalletModal = ({ user, pendingTail, onWithdraw, onClose }) => {
         </div>
 
         <div className="p-6 overflow-y-auto flex-1 space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">申請總額</div>
+              <div className="font-bold text-slate-900 font-num">{formatCurrency(submittedTotal)}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">申請中</div>
+              <div className="font-bold text-amber-600 font-num">{formatCurrency(pendingTotal)}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">已核准待匯</div>
+              <div className="font-bold text-slate-700 font-num">{formatCurrency(approvedTotal)}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">已匯款</div>
+              <div className="font-bold text-emerald-600 font-num">{formatCurrency(paidTotal)}</div>
+            </div>
+          </div>
+
           <div className="card-modern p-5">
             <div className="text-xs font-bold text-slate-400 uppercase mb-2">可提領餘額</div>
             <div className="text-3xl font-bold text-slate-900 font-num">{formatCurrency(wallet)}</div>
             <div className="text-xs text-slate-400 mt-2">提領帳戶：{user.withdrawAccount || "尚未設定"}</div>
+          </div>
+
+          <div className="card-modern p-5">
+            <div className="text-xs font-bold text-slate-400 uppercase mb-2">匯款核對資訊</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">
+              <div><span className="text-xs text-slate-400 block">銀行名稱</span>{user.bankName || "-"}</div>
+              <div><span className="text-xs text-slate-400 block">銀行代碼</span>{user.bankCode || "-"}</div>
+              <div><span className="text-xs text-slate-400 block">帳號</span>{user.accountNo || "-"}</div>
+              <div><span className="text-xs text-slate-400 block">戶名</span>{user.accountName || "-"}</div>
+            </div>
+            <div className="mt-3">
+              {user.bankBookPhoto ? (
+                <img src={user.bankBookPhoto} alt="戶頭照片" className="w-full max-w-md rounded-2xl border border-slate-200" />
+              ) : (
+                <div className="text-xs text-slate-400">尚未上傳戶頭照片。</div>
+              )}
+            </div>
           </div>
 
           <div className="card-modern p-5">
@@ -2619,19 +3421,49 @@ const WalletModal = ({ user, pendingTail, onWithdraw, onClose }) => {
             ) : (
               <div className="space-y-2">
                 {myWithdrawals.slice(0, 8).map((w) => (
-                  <div key={w.id} className="flex items-center justify-between text-xs bg-white border border-slate-200 rounded-lg px-3 py-2">
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => setSelectedWithdrawal(w)}
+                    className={`w-full flex items-center justify-between text-xs bg-white border rounded-lg px-3 py-2 text-left transition ${selected?.id === w.id ? "border-indigo-300 ring-2 ring-indigo-100" : "border-slate-200 hover:bg-slate-50"}`}
+                  >
                     <div>
-                      <div className="font-bold">{statusLabel(w.status)}</div>
+                      <div className="font-bold">{withdrawalStatusLabel(w.status)}</div>
                       <div className="text-slate-400">申請：{w.createdAt ? new Date(w.createdAt).toLocaleString() : "-"}</div>
                       <div className="text-slate-400">預計匯款：{w.scheduledAt ? new Date(w.scheduledAt).toLocaleString() : "-"}</div>
                     </div>
                     <div className="font-bold text-slate-800 font-num">{formatCurrency(w.amount)}</div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
           </div>
-          </div>
+
+          {selected && (
+            <div className="card-modern p-5">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div>
+                  <div className="text-xs text-slate-400">提領明細</div>
+                  <div className="font-bold text-slate-900">{withdrawalStatusLabel(selected.status)}</div>
+                </div>
+                <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700">{selected.speed === "fast" ? "閃電提領" : "標準提領"}</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600">
+                <div>提領編號：{selected.id}</div>
+                <div>金額：{formatCurrency(selected.amount)}</div>
+                <div>申請時間：{selected.createdAt ? new Date(selected.createdAt).toLocaleString() : "-"}</div>
+                <div>預計匯款：{selected.scheduledAt ? new Date(selected.scheduledAt).toLocaleString() : "-"}</div>
+                <div>核准時間：{selected.approvedAt ? new Date(selected.approvedAt).toLocaleString() : "-"}</div>
+                <div>匯款時間：{selected.paidAt ? new Date(selected.paidAt).toLocaleString() : "-"}</div>
+                <div>銀行：{selected.bankName || user.bankName || "-"}</div>
+                <div>帳號：{selected.accountNo || user.accountNo || "-"}</div>
+                <div>戶名：{selected.accountName || user.accountName || "-"}</div>
+                <div>提領帳戶：{selected.withdrawAccount || user.withdrawAccount || "-"}</div>
+              </div>
+              {selected.note && <div className="mt-3 text-xs text-slate-500">備註：{selected.note}</div>}
+            </div>
+          )}
+        </div>
 
         <div className="p-6 border-t border-slate-100 bg-white">
           <button onClick={onClose} className="w-full btn btn-outline">關閉</button>
@@ -2662,12 +3494,13 @@ const ProfileModal = ({ user, onClose }) => {
     bankCode: user?.bankCode || "",
     accountNo: user?.accountNo || "",
     accountName: user?.accountName || "",
+    bankBookPhoto: user?.bankBookPhoto || "",
     licenseNo: user?.licenseNo || "",
   });
 
   const isEngineer = user?.role === "engineer";
   const isClientBiz = user?.role === "client_business";
-  const roleLabel = isEngineer ? "技師" : user?.role?.startsWith("client") ? "客戶" : (user?.role || "");
+    const roleLabel = isEngineer ? "技師" : roleGroup(user?.role) === "client" ? "客戶" : (user?.role || "");
 
   const save = () => {
     const name = String(form.name || "").trim();
@@ -2689,6 +3522,7 @@ const ProfileModal = ({ user, onClose }) => {
     const bankCode = String(form.bankCode || "").trim();
     const accountNo = String(form.accountNo || "").trim();
     const accountName = String(form.accountName || "").trim();
+    const bankBookPhoto = String(form.bankBookPhoto || "").trim();
     const licenseNo = String(form.licenseNo || "").trim();
 
     if (!name) {
@@ -2722,6 +3556,7 @@ const ProfileModal = ({ user, onClose }) => {
       bankCode,
       accountNo,
       accountName,
+      bankBookPhoto,
       licenseNo,
       avatar: name ? name[0] : (user.avatar || "U"),
     });
@@ -2821,6 +3656,32 @@ const ProfileModal = ({ user, onClose }) => {
                 <label className="text-xs font-bold text-slate-500 mb-2 block">戶名</label>
                 <input className="input-modern" value={form.accountName} onChange={(e) => setForm((p) => ({ ...p, accountName: e.target.value }))} placeholder="戶名" />
               </div>
+              <div className="md:col-span-2">
+                <label className="text-xs font-bold text-slate-500 mb-2 block">戶頭照片</label>
+                <div className="space-y-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="input-modern"
+                    onChange={async (e) => {
+                      const file = e.target.files && e.target.files[0];
+                      if (!file) return;
+                      try {
+                        const imageDataUrl = await compressImageFile(file);
+                        setForm((p) => ({ ...p, bankBookPhoto: imageDataUrl }));
+                        addToast("已上傳戶頭照片", "success");
+                      } catch {
+                        addToast("戶頭照片上傳失敗，請改用較小圖片", "error");
+                      }
+                    }}
+                  />
+                  {form.bankBookPhoto ? (
+                    <img src={form.bankBookPhoto} alt="戶頭照片" className="w-full max-w-md rounded-2xl border border-slate-200" />
+                  ) : (
+                    <div className="text-xs text-slate-400">上傳存摺封面或戶頭照片，方便會計核對。</div>
+                  )}
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -2840,9 +3701,12 @@ const TechView = ({ user }) => {
   const { jobs, setJobs, users, withdrawals, logout, updateUser, requestWithdrawal } = useApp();
   const [selectedJob, setSelectedJob] = useState(null);
   const [tab, setTab] = useState("market");
+  const [statusTab, setStatusTab] = useState("all");
   const [showWallet, setShowWallet] = useState(false);
   const { addToast } = useToast();
   const [showProfile, setShowProfile] = useState(false);
+  const [infoTab, setInfoTab] = useState("contact");
+  const [detailMode, setDetailMode] = useState(null);
   const [showInbox, setShowInbox] = useState(false);
   const [chatJob, setChatJob] = useState(null);
   const chatPeer = chatJob ? users.find((u) => u.id === chatJob.clientId) : null;
@@ -2852,8 +3716,23 @@ const TechView = ({ user }) => {
 
   const marketJobs = jobs.filter((j) => j.status === "open");
   const myJobs = jobs.filter((j) => j.assignee === user.id);
-
-  const list = tab === "market" ? marketJobs : myJobs;
+  const baseJobs = tab === "market" ? marketJobs : myJobs;
+  const visibleJobs = useMemo(() => {
+    if (statusTab === "all") return baseJobs;
+    return baseJobs.filter((j) => j.status === statusTab);
+  }, [baseJobs, statusTab]);
+  const statusTabs = [
+    { id: "all", label: "全部", count: baseJobs.length },
+    { id: "open", label: "媒合中", count: baseJobs.filter((j) => j.status === "open").length },
+    { id: "active", label: "施工中", count: baseJobs.filter((j) => j.status === "active").length },
+    { id: "completed", label: "待驗收", count: baseJobs.filter((j) => j.status === "completed").length },
+    { id: "closed", label: "已完成", count: baseJobs.filter((j) => j.status === "closed").length },
+  ];
+  const overdueJobs = useMemo(() => myJobs.filter((j) => getJobRiskState(j).tone === "danger"), [myJobs]);
+  const arrivePendingJobs = useMemo(() => myJobs.filter((j) => j.status === "active" && !j.techArrived), [myJobs]);
+  const reportPendingJobs = useMemo(() => myJobs.filter((j) => j.status === "active" && j.techArrived), [myJobs]);
+  const acceptPendingJobs = useMemo(() => myJobs.filter((j) => j.status === "completed"), [myJobs]);
+  const closedJobs = useMemo(() => myJobs.filter((j) => j.status === "closed"), [myJobs]);
 
   const pendingTail = jobs
     .filter((j) => j.assignee === user.id && j.status === "completed")
@@ -2863,10 +3742,15 @@ const TechView = ({ user }) => {
       const tail = Number(j.tailAmount) || (total - dep);
       return acc + tail;
     }, 0);
+  const completedIncomeJobs = useMemo(() => jobs.filter((j) => j.assignee === user.id && j.status === "closed"), [jobs, user.id]);
+  const completedIncomeTotal = useMemo(() => completedIncomeJobs.reduce((acc, j) => acc + calcJobTotal(j), 0), [completedIncomeJobs]);
 
   const myWithdrawals = useMemo(() => withdrawals.filter((w) => w.userId === user.id), [withdrawals, user.id]);
-  const withdrawnTotal = myWithdrawals.filter((w) => w.status === "approved").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+  const withdrawnTotal = myWithdrawals.filter((w) => w.status === "approved" || w.status === "paid").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
   const pendingWithdrawTotal = myWithdrawals.filter((w) => w.status === "pending").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+  const approvedWithdrawTotal = myWithdrawals.filter((w) => w.status === "approved").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+  const paidWithdrawTotal = myWithdrawals.filter((w) => w.status === "paid").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+  const availableWithdrawTotal = Number(user.wallet) || 0;
   const earnedTotal = useMemo(() => {
     return jobs
       .filter((j) => j.assignee === user.id && (j.status === "closed" || j.paidAt))
@@ -2889,6 +3773,7 @@ const TechView = ({ user }) => {
         accountNo: user.accountNo,
         accountName: user.accountName,
         withdrawAccount: user.withdrawAccount,
+        bankBookPhoto: user.bankBookPhoto,
       },
     });
     updateUser({ ...user, wallet: 0 });
@@ -2902,9 +3787,10 @@ const TechView = ({ user }) => {
         <ProjectDetail
           job={selectedJob}
           user={user}
-          onClose={() => setSelectedJob(null)}
+          onClose={() => { setSelectedJob(null); setDetailMode(null); }}
           onUpdate={(u) => { setJobs((prev) => prev.map((j) => (j.id === u.id ? normalizeJob(u) : j))); setSelectedJob(normalizeJob(u)); }}
           addToast={addToast}
+          focusSupplement={detailMode === "supplement"}
         />
       )}
 
@@ -2914,7 +3800,7 @@ const TechView = ({ user }) => {
         <ConversationsModal
           me={user}
           onClose={() => { setShowInbox(false); setNav("jobs"); }}
-          onOpen={(j) => { setChatJob(normalizeJob(j)); setShowInbox(false); }}
+          onOpen={(j) => { setChatJob(normalizeJob(j)); }}
         />
       )}
 
@@ -2928,12 +3814,14 @@ const TechView = ({ user }) => {
             setChatJob(normalizeJob(u));
             setSelectedJob((prev) => (prev && prev.id === u.id ? normalizeJob(u) : prev));
           }}
-          onClose={() => { setChatJob(null); setNav("jobs"); }}
+          onBack={() => setChatJob(null)}
+          onClose={() => { setChatJob(null); setShowInbox(false); setNav("jobs"); }}
         />
       )}
 
       {showProfile && <ProfileModal user={user} onClose={() => { setShowProfile(false); setNav("jobs"); }} />}
-      <div className="p-6 sticky top-0 bg-white/80 backdrop-blur-md z-10 border-b border-slate-100 flex justify-between items-center">
+      <div className="mx-auto max-w-3xl px-4">
+      <div className="p-6 sticky top-0 bg-white/80 backdrop-blur-md z-10 border-b border-slate-100 flex justify-between items-center rounded-b-3xl shadow-sm">
         <div>
           <h2 className="text-xl font-bold text-slate-800">{tab === "market" ? "接案大廳" : "我的任務"}</h2>
           <p className="text-xs text-slate-400">待媒合 {marketJobs.length} | 我的 {myJobs.length}</p>
@@ -2947,7 +3835,7 @@ const TechView = ({ user }) => {
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-4 space-y-4">
         <div className="grid grid-cols-2 gap-3 mb-4">
           <button onClick={() => setTab("market")} className={`p-3 rounded-2xl font-bold text-sm border transition ${tab === "market" ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
             待媒合
@@ -2955,6 +3843,25 @@ const TechView = ({ user }) => {
           <button onClick={() => setTab("mine")} className={`p-3 rounded-2xl font-bold text-sm border transition ${tab === "mine" ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
             我的任務
           </button>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="card-modern p-4">
+            <div className="text-xs text-slate-400">待打卡</div>
+            <div className="text-xl font-bold text-amber-600 font-num">{arrivePendingJobs.length}</div>
+          </div>
+          <div className="card-modern p-4">
+            <div className="text-xs text-slate-400">待回報</div>
+            <div className="text-xl font-bold text-blue-700 font-num">{reportPendingJobs.length}</div>
+          </div>
+          <div className="card-modern p-4">
+            <div className="text-xs text-slate-400">待驗收</div>
+            <div className="text-xl font-bold text-indigo-700 font-num">{acceptPendingJobs.length}</div>
+          </div>
+          <div className="card-modern p-4">
+            <div className="text-xs text-slate-400">逾期</div>
+            <div className="text-xl font-bold text-rose-600 font-num">{overdueJobs.length}</div>
+          </div>
         </div>
 
         <div className="card-modern p-5 mb-4">
@@ -3005,12 +3912,52 @@ const TechView = ({ user }) => {
           )}
         </div>
 
+        <div className="card-modern p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-slate-800">作業重點</h3>
+            <span className="text-xs text-slate-400">現場使用</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+              <div className="text-xs text-slate-400">當前模式</div>
+              <div className="font-bold text-slate-800">{tab === "market" ? "待媒合" : "我的任務"}</div>
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+              <div className="text-xs text-slate-400">下一個動作</div>
+              <div className="font-bold text-indigo-700">{tab === "market" ? "挑選可承接案件" : (arrivePendingJobs.length > 0 ? "先打卡到場" : reportPendingJobs.length > 0 ? "完成回報並上傳照片" : "等待客戶驗收")}</div>
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+              <div className="text-xs text-slate-400">已完成案件</div>
+              <div className="font-bold text-emerald-700">{closedJobs.length}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card-modern p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-slate-800">案件狀態</h3>
+            <span className="text-xs text-slate-400">依狀態分類顯示</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            {statusTabs.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setStatusTab(s.id)}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold whitespace-nowrap ${statusTab === s.id ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}
+              >
+                {s.label} {s.count}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="space-y-4">
-          {list.map((j) => {
+          {visibleJobs.map((j) => {
             const total = calcJobTotal(j);
             const pro = isProJob(j);
             const dist = pseudoDistanceKm(j.id);
             const statusColor = j.status === "open" ? "bg-green-100 text-green-700" : j.status === "active" ? "bg-blue-100 text-blue-700" : j.status === "completed" ? "bg-purple-100 text-purple-700" : "bg-slate-100 text-slate-600";
+            const risk = getJobRiskState(j);
 
             return (
               <div key={j.id} onClick={() => setSelectedJob(j)} className="card-modern p-5 cursor-pointer">
@@ -3018,6 +3965,7 @@ const TechView = ({ user }) => {
                   <div className="flex items-center gap-2">
                             <span className={`text-xs px-2 py-1 rounded font-bold ${statusColor}`}>{getStatusProgress(j.status).label}</span>
                     {tab === "market" && pro && <span className="text-[10px] px-2 py-1 rounded-full bg-slate-900 text-white font-bold">PRO</span>}
+                    {risk.tone === "danger" && <span className="text-[10px] px-2 py-1 rounded-full bg-rose-100 text-rose-700 font-bold">逾期</span>}
                   </div>
                   <span className="font-bold text-lg text-indigo-600 font-num">{formatCurrency(total)}</span>
                 </div>
@@ -3033,14 +3981,28 @@ const TechView = ({ user }) => {
                   <span>耗材 {(j.materials || []).length} 項</span>
                   <span>照片 {(j.photos || []).length} 張</span>
                   <span>訊息 {(j.messages || []).length} 則</span>
+                  <span>年齡 {getJobAgeDays(j)} 天</span>
                 </div>
+                <div className="mt-2 text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                  下一步：{getJobNextAction(j)}
+                </div>
+                {j.auditStatus === "needs_fix" && (
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectedJob(j); setDetailMode("supplement"); }}
+                      className="px-3 py-2 rounded-xl bg-rose-50 text-rose-700 text-xs font-bold border border-rose-100 hover:bg-rose-100"
+                    >
+                      補件回報
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
 
-          {list.length === 0 && (
+          {visibleJobs.length === 0 && (
             <div className="text-sm text-slate-400 bg-white border border-slate-200 rounded-2xl p-6 text-center">
-              {tab === "market" ? "目前沒有待媒合案件" : "你目前沒有進行中的任務"}
+              {tab === "market" ? "目前沒有待媒合案件" : "你目前沒有符合條件的任務"}
             </div>
           )}
         </div>
@@ -3075,18 +4037,18 @@ const TechView = ({ user }) => {
           { id: "me", label: "我的", icon: "user" },
         ]}
       />
-
-</div>
+      </div>
+    </div>
   );
 };
 
 
 
 const AdminView = ({ user }) => {
-  const { jobs, setJobs, users, setUsers, withdrawals, setWithdrawals, updateUser, updateWithdrawal, logout, resetData } = useApp();
+  const { jobs, setJobs, users, setUsers, withdrawals, setWithdrawals, inventory, setInventory, updateUser, updateWithdrawal, logout, resetData } = useApp();
   const { addToast } = useToast();
 
-  // Views: overview | jobs | users | approvals | reports | settings
+  // Views: overview | jobs | users | approvals | finance | reports | settings
   const [view, setView] = useState("overview");
 
   // Modals
@@ -3099,6 +4061,11 @@ const AdminView = ({ user }) => {
   const [createJobOpen, setCreateJobOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [financeTab, setFinanceTab] = useState("payments");
+  const [financeQuery, setFinanceQuery] = useState("");
+  const [financePaymentStatus, setFinancePaymentStatus] = useState("all");
+  const [financeWithdrawalStatus, setFinanceWithdrawalStatus] = useState("all");
+  const [selectedWithdrawal, setSelectedWithdrawal] = useState(null);
 
   // Filters
   const [qJobs, setQJobs] = useState("");
@@ -3140,7 +4107,7 @@ const AdminView = ({ user }) => {
   const getUserName = (id, fallback = "") => getUserById(id)?.name || fallback || "";
   const getUserPhone = (id) => getUserById(id)?.phone || "";
   const roleLabel = (role) => {
-    if (String(role).startsWith("client")) return "客戶";
+    if (roleGroup(role) === "client") return "客戶";
     if (role === "engineer") return "工程師";
     if (role === "admin") return "管理員";
     return role || "-";
@@ -3150,6 +4117,12 @@ const AdminView = ({ user }) => {
     if (v === "needs_fix") return "需補件";
     if (v === "unreviewed" || !v) return "未稽核";
     return v;
+  };
+  const financePaymentLabel = (j) => {
+    if (j.status === "closed") return j.tail_paid ? "已結清" : "待匯尾款";
+    if (j.status === "completed") return "待客戶驗收";
+    if (j.status === "active") return j.deposit_paid ? "施工中 / 訂金已收" : "施工中 / 訂金未收";
+    return j.deposit_paid ? "媒合中 / 訂金已收" : "待收訂金";
   };
 
   const downloadText = (filename, text, mime = "text/plain;charset=utf-8") => {
@@ -3189,36 +4162,36 @@ const AdminView = ({ user }) => {
       const dep = Number(j.depositAmount) || calcDeposit(total);
       const tail = Number(j.tailAmount) || calcTail(total);
       return {
-        id: j.id,
-        status: j.status,
-        type: j.type,
-        title: j.title,
-        client: getUserName(j.clientId, j.clientName),
-        client_phone: getUserPhone(j.clientId),
-        engineer: getUserName(j.assignee),
-        engineer_phone: getUserPhone(j.assignee),
-        address: j.address,
-        scheduledDate: j.scheduledDate,
-        laborBudget: j.laborBudget,
-        materialBudget: j.materialBudget,
-        total,
-        deposit_paid: j.deposit_paid ? "Y" : "N",
-        depositAmount: dep,
-        tail_paid: j.tail_paid ? "Y" : "N",
-        tailAmount: tail,
-        created_at: j.created_at,
-        paidAt: j.paidAt || "",
-        photos: (j.photos || []).length,
-        materials: (j.materials || []).length,
-        messages: (j.messages || []).length,
-        acceptance_flag: j.acceptanceFlag ? "Y" : "N",
-        acceptance_note: j.acceptanceNote || "",
-        acceptance_at: j.acceptanceAt || "",
-        acceptance_by: getUserName(j.acceptanceBy),
-        audit_status: j.auditStatus || "",
-        audit_note: j.auditNote || "",
-        audit_at: j.auditAt || "",
-        audit_by: getUserName(j.auditBy),
+        工單編號: j.id,
+        狀態: JOB_STATUS_LABEL[j.status] || j.status || "",
+        類別: j.type,
+        標題: j.title,
+        客戶: getUserName(j.clientId, j.clientName),
+        客戶電話: getUserPhone(j.clientId),
+        工程師: getUserName(j.assignee),
+        工程師電話: getUserPhone(j.assignee),
+        地址: j.address,
+        預約時間: j.scheduledDate,
+        工資: j.laborBudget,
+        材料費: j.materialBudget,
+        總金額: total,
+        訂金已收: j.deposit_paid ? "是" : "否",
+        訂金金額: dep,
+        尾款已收: j.tail_paid ? "是" : "否",
+        尾款金額: tail,
+        建立時間: j.created_at,
+        結案時間: j.paidAt || "",
+        照片數量: (j.photos || []).length,
+        耗材數量: (j.materials || []).length,
+        訊息數量: (j.messages || []).length,
+        驗收異常: j.acceptanceFlag ? "是" : "否",
+        驗收備註: j.acceptanceNote || "",
+        驗收時間: j.acceptanceAt || "",
+        驗收人員: getUserName(j.acceptanceBy),
+        稽核狀態: auditLabel(j.auditStatus),
+        稽核備註: j.auditNote || "",
+        稽核時間: j.auditAt || "",
+        稽核人員: getUserName(j.auditBy),
       };
     });
 
@@ -3229,21 +4202,21 @@ const AdminView = ({ user }) => {
 
   const exportUsers = (list, format = "csv") => {
     const rows = list.map((u) => ({
-      id: u.id,
-      role: u.role,
-      status: u.status || "",
-      name: u.name || "",
-      email: u.email || "",
-      phone: u.phone || "",
-      address: u.address || "",
-      company_name: u.company_name || u.company || "",
-      tax_id: u.tax_id || u.taxId || u.taxid || "",
-      title: u.title || "",
-      experience: u.experience || "",
-      rating: u.rating ?? "",
-      jobs: u.jobs ?? "",
-      skills: Array.isArray(u.skills) ? u.skills.join("|") : "",
-      wallet: u.wallet ?? 0,
+      會員編號: u.id,
+      角色: roleLabel(u.role),
+      狀態: userStatusLabel(u.status),
+      姓名: u.name || "",
+      Email: u.email || "",
+      電話: u.phone || "",
+      地址: u.address || "",
+      公司名稱: u.company_name || u.company || "",
+      統一編號: u.tax_id || u.taxId || u.taxid || "",
+      職稱: u.title || "",
+      年資: u.experience || "",
+      評分: u.rating ?? "",
+      完成案件數: u.jobs ?? "",
+      技能: Array.isArray(u.skills) ? u.skills.join("|") : "",
+      錢包: u.wallet ?? 0,
     }));
 
     const stamp = new Date().toISOString().slice(0, 10);
@@ -3259,8 +4232,9 @@ const AdminView = ({ user }) => {
       jobs,
       audit,
       withdrawals,
+      inventory,
     };
-    logAudit("export_snapshot", `users=${users.length} jobs=${jobs.length}`);
+    logAudit("export_snapshot", `users=${users.length} jobs=${jobs.length} inventory=${inventory.length}`);
     downloadText(`cloudlink_snapshot_${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(payload, null, 2), "application/json;charset=utf-8");
     addToast("已匯出完整備份(JSON)", "success");
   };
@@ -3272,7 +4246,7 @@ const AdminView = ({ user }) => {
   }, [jobs]);
 
   const engineers = useMemo(() => users.filter((u) => u.role === "engineer"), [users]);
-  const clients = useMemo(() => users.filter((u) => String(u.role || "").startsWith("client")), [users]);
+  const clients = useMemo(() => users.filter((u) => roleGroup(u.role) === "client"), [users]);
   const admins = useMemo(() => users.filter((u) => u.role === "admin"), [users]);
 
   const filteredJobs = useMemo(() => {
@@ -3489,9 +4463,39 @@ const AdminView = ({ user }) => {
   };
 
   const approveWithdrawal = (w) => {
-    updateWithdrawal(w.id, { status: "approved", reviewedAt: new Date().toISOString(), reviewerId: user.id });
+    updateWithdrawal(w.id, {
+      status: "approved",
+      reviewedAt: new Date().toISOString(),
+      reviewerId: user.id,
+      approvedAt: new Date().toISOString(),
+      approvedBy: user.id,
+    });
     logAudit("approve_withdrawal", `id=${w.id} amount=${w.amount}`);
-    addToast("已通過提領申請", "success");
+    addToast("已核准提領，待匯款", "success");
+  };
+
+  const updateJobAudit = (job, nextStatus, note = "") => {
+    const current = normalizeJob(job);
+    const merged = normalizeJob({
+      ...current,
+      auditStatus: nextStatus,
+      auditAt: new Date().toISOString(),
+      auditBy: user?.id || "admin",
+      auditNote: note || current.auditNote || "",
+    });
+    setJobs((prev) => prev.map((j) => (j.id === job.id ? merged : j)));
+    logAudit(nextStatus === "approved" ? "approve_job_audit" : "needs_fix_job_audit", `${job.id} ${note || ""}`.trim());
+    addToast(nextStatus === "approved" ? "已通過工單稽核" : "已標記需補件", "success");
+  };
+
+  const markWithdrawalPaid = (w) => {
+    updateWithdrawal(w.id, {
+      status: "paid",
+      paidAt: new Date().toISOString(),
+      paidBy: user.id,
+    });
+    logAudit("pay_withdrawal", `id=${w.id} amount=${w.amount}`);
+    addToast("已標記完成匯款", "success");
   };
 
   const rejectWithdrawal = (w) => {
@@ -3635,7 +4639,7 @@ const AdminView = ({ user }) => {
             </div>
 
             <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="overflow-x-auto no-scrollbar">
+              <div className="overflow-x-scroll pb-2">
                 <table className="min-w-[900px] w-full text-left text-sm">
                   <thead className="bg-white border-b text-slate-500">
                     <tr>
@@ -3680,6 +4684,7 @@ const AdminView = ({ user }) => {
         const nextJobs = Array.isArray(payload.jobs) ? payload.jobs : null;
         const nextAudit = Array.isArray(payload.audit) ? payload.audit : null;
         const nextWithdrawals = Array.isArray(payload.withdrawals) ? payload.withdrawals : null;
+        const nextInventory = Array.isArray(payload.inventory) ? payload.inventory : null;
 
         if (!nextUsers || !nextJobs) {
           addToast("檔案格式不正確：需要包含 users/jobs", "error");
@@ -3693,15 +4698,16 @@ const AdminView = ({ user }) => {
         }
 
         if (mode === "replace") {
-          setUsers(nextUsers);
+          setUsers(nextUsers.map(normalizeUser));
           setJobs(nextJobs.map(normalizeJob));
           if (nextAudit) setAudit(nextAudit);
           if (nextWithdrawals) setWithdrawals(nextWithdrawals);
+          if (nextInventory) setInventory(nextInventory.map(normalizeInventoryItem));
         } else {
           setUsers((prev) => {
             const map = new Map(prev.map((u) => [u.id, u]));
-            nextUsers.forEach((u) => map.set(u.id, { ...map.get(u.id), ...u }));
-            return Array.from(map.values());
+            nextUsers.forEach((u) => map.set(u.id, normalizeUser({ ...map.get(u.id), ...u })));
+            return Array.from(map.values()).map(normalizeUser);
           });
           setJobs((prev) => {
             const map = new Map(prev.map((j) => [j.id, j]));
@@ -3714,6 +4720,13 @@ const AdminView = ({ user }) => {
               const map = new Map(prev.map((w) => [w.id, w]));
               nextWithdrawals.forEach((w) => map.set(w.id, { ...map.get(w.id), ...w }));
               return Array.from(map.values());
+            });
+          }
+          if (nextInventory) {
+            setInventory((prev) => {
+              const map = new Map(prev.map((item) => [item.id, item]));
+              nextInventory.forEach((item) => map.set(item.id, normalizeInventoryItem({ ...map.get(item.id), ...item })));
+              return Array.from(map.values()).map(normalizeInventoryItem);
             });
           }
         }
@@ -3777,6 +4790,13 @@ const AdminView = ({ user }) => {
       title: "",
       experience: "",
       skills: "",
+      licenseNo: "",
+      withdrawAccount: "",
+      bankName: "",
+      bankCode: "",
+      accountNo: "",
+      accountName: "",
+      bankBookPhoto: "",
     });
 
     const save = () => {
@@ -3806,9 +4826,16 @@ const AdminView = ({ user }) => {
         u.skills = form.skills.split(",").map((s) => s.trim()).filter(Boolean);
         u.rating = 5.0;
         u.jobs = 0;
+        u.licenseNo = form.licenseNo;
+        u.withdrawAccount = form.withdrawAccount;
+        u.bankName = form.bankName;
+        u.bankCode = form.bankCode;
+        u.accountNo = form.accountNo;
+        u.accountName = form.accountName;
+        u.bankBookPhoto = form.bankBookPhoto;
       }
 
-      setUsers((prev) => [...prev, u]);
+      setUsers((prev) => [...prev, normalizeUser(u)]);
       logAudit("create_user", `${u.role} ${u.id}`);
       addToast("已新增會員", "success");
       onClose();
@@ -3900,6 +4927,50 @@ const AdminView = ({ user }) => {
                 <div className="md:col-span-2">
                   <label className="text-xs font-bold text-slate-500 block mb-1">技能 (逗號分隔)</label>
                   <input className="input-modern" value={form.skills} onChange={(e) => setForm({ ...form, skills: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">證照/執照編號</label>
+                  <input className="input-modern" value={form.licenseNo} onChange={(e) => setForm({ ...form, licenseNo: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">提領帳戶</label>
+                  <input className="input-modern" value={form.withdrawAccount} onChange={(e) => setForm({ ...form, withdrawAccount: e.target.value })} placeholder="銀行帳號/戶名" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">銀行名稱</label>
+                  <input className="input-modern" value={form.bankName} onChange={(e) => setForm({ ...form, bankName: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">銀行代碼</label>
+                  <input className="input-modern" value={form.bankCode} onChange={(e) => setForm({ ...form, bankCode: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">帳號</label>
+                  <input className="input-modern" value={form.accountNo} onChange={(e) => setForm({ ...form, accountNo: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">戶名</label>
+                  <input className="input-modern" value={form.accountName} onChange={(e) => setForm({ ...form, accountName: e.target.value })} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-500 block mb-1">戶頭照片</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="input-modern"
+                    onChange={async (e) => {
+                      const file = e.target.files && e.target.files[0];
+                      if (!file) return;
+                      try {
+                        const imageDataUrl = await compressImageFile(file);
+                        setForm((p) => ({ ...p, bankBookPhoto: imageDataUrl }));
+                        addToast("已上傳戶頭照片", "success");
+                      } catch {
+                        addToast("戶頭照片上傳失敗，請改用較小圖片", "error");
+                      }
+                    }}
+                  />
+                  {form.bankBookPhoto ? <img src={form.bankBookPhoto} alt="戶頭照片" className="mt-2 w-full max-w-md rounded-2xl border border-slate-200" /> : <div className="mt-2 text-xs text-slate-400">上傳戶頭照片，方便會計核對</div>}
                 </div>
               </>
             )}
@@ -4055,7 +5126,7 @@ const AdminView = ({ user }) => {
     const isClientBiz = form.role === "client_business";
 
     const save = () => {
-      setUsers((prev) => prev.map((u) => (u.id === data.id ? { ...u, ...form } : u)));
+      setUsers((prev) => prev.map((u) => (u.id === data.id ? normalizeUser({ ...u, ...form }) : u)));
       logAudit("edit_user", data.id);
       addToast("會員資料已更新", "success");
       onClose();
@@ -4147,6 +5218,50 @@ const AdminView = ({ user }) => {
                     onChange={(e) => setForm({ ...form, skills: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
                   />
                 </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">證照/執照編號</label>
+                  <input className="input-modern" value={form.licenseNo || ""} onChange={(e) => setForm({ ...form, licenseNo: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">提領帳戶</label>
+                  <input className="input-modern" value={form.withdrawAccount || ""} onChange={(e) => setForm({ ...form, withdrawAccount: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">銀行名稱</label>
+                  <input className="input-modern" value={form.bankName || ""} onChange={(e) => setForm({ ...form, bankName: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">銀行代碼</label>
+                  <input className="input-modern" value={form.bankCode || ""} onChange={(e) => setForm({ ...form, bankCode: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">帳號</label>
+                  <input className="input-modern" value={form.accountNo || ""} onChange={(e) => setForm({ ...form, accountNo: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">戶名</label>
+                  <input className="input-modern" value={form.accountName || ""} onChange={(e) => setForm({ ...form, accountName: e.target.value })} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-500 block mb-1">戶頭照片</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="input-modern"
+                    onChange={async (e) => {
+                      const file = e.target.files && e.target.files[0];
+                      if (!file) return;
+                      try {
+                        const imageDataUrl = await compressImageFile(file);
+                        setForm({ ...form, bankBookPhoto: imageDataUrl });
+                        addToast("已更新戶頭照片", "success");
+                      } catch {
+                        addToast("戶頭照片上傳失敗，請改用較小圖片", "error");
+                      }
+                    }}
+                  />
+                  {form.bankBookPhoto ? <img src={form.bankBookPhoto} alt="戶頭照片" className="mt-2 w-full max-w-md rounded-2xl border border-slate-200" /> : <div className="mt-2 text-xs text-slate-400">尚未上傳戶頭照片</div>}
+                </div>
               </>
             )}
 
@@ -4172,6 +5287,35 @@ const AdminView = ({ user }) => {
 
   const UserInspectModal = ({ data, onClose }) => {
     const u = data;
+    const memberJobs = jobs.filter((j) => j.clientId === u.id || j.assignee === u.id);
+    const recentMemberJobs = [...memberJobs].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).slice(0, 6);
+    const memberClosedJobs = memberJobs.filter((j) => j.status === "closed");
+    const memberActiveJobs = memberJobs.filter((j) => j.status === "active" || j.status === "completed");
+    const memberRevenue = memberClosedJobs.reduce((acc, j) => acc + calcJobTotal(j), 0);
+    const memberPendingTail = memberJobs.filter((j) => j.status !== "closed").reduce((acc, j) => {
+      const total = calcJobTotal(j);
+      const dep = Number(j.depositAmount) || calcDeposit(total);
+      return acc + (Number(j.tailAmount) || (total - dep));
+    }, 0);
+    const memberWithdrawals = withdrawals.filter((w) => w.userId === u.id);
+    const recentMemberWithdrawals = [...memberWithdrawals].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()).slice(0, 6);
+    const memberWithdrawnTotal = memberWithdrawals.filter((w) => w.status === "paid" || w.status === "approved").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+    const memberDepositTotal = memberJobs.reduce((acc, j) => {
+      const total = calcJobTotal(j);
+      return acc + (j.deposit_paid ? (Number(j.depositAmount) || calcDeposit(total)) : 0);
+    }, 0);
+    const memberTailTotal = memberJobs.reduce((acc, j) => {
+      const total = calcJobTotal(j);
+      const dep = Number(j.depositAmount) || calcDeposit(total);
+      return acc + ((j.tail_paid || j.status === "closed" || j.paidAt) ? (Number(j.tailAmount) || (total - dep)) : 0);
+    }, 0);
+    const bankInfo = [
+      { label: "銀行名稱", value: u.bankName || "-" },
+      { label: "銀行代碼", value: u.bankCode || "-" },
+      { label: "帳號", value: u.accountNo || "-" },
+      { label: "戶名", value: u.accountName || "-" },
+      { label: "提領帳戶", value: u.withdrawAccount || "-" },
+    ];
     return (
       <div className="fixed inset-0 z-[220] bg-black/50 flex items-start justify-center p-4 py-6 overflow-y-auto">
         <div className="bg-white w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -4194,7 +5338,113 @@ const AdminView = ({ user }) => {
               <div className="md:col-span-2"><span className="text-xs text-slate-400 block">技能</span>{u.skills.join(", ")}</div>
             )}
           </div>
-          <div className="p-6 border-t flex gap-3">
+          <div className="px-6 pb-2 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">案件數</div>
+              <div className="text-xl font-bold text-slate-800 font-num">{memberJobs.length}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">已結案</div>
+              <div className="text-xl font-bold text-emerald-600 font-num">{memberClosedJobs.length}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">未結案應收</div>
+              <div className="text-xl font-bold text-amber-600 font-num">{formatCurrency(memberPendingTail)}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">已入帳</div>
+              <div className="text-xl font-bold text-indigo-700 font-num">{formatCurrency(memberRevenue || memberWithdrawnTotal)}</div>
+            </div>
+          </div>
+          <div className="px-6 pb-6">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs font-bold text-slate-500 mb-2">最近狀況</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">
+                <div>進行中 / 待驗收：{memberActiveJobs.length}</div>
+                <div>提領紀錄：{memberWithdrawals.length}</div>
+                <div>最近提領：{memberWithdrawals.length > 0 ? withdrawalStatusLabel(memberWithdrawals[0].status) : "-"}</div>
+                <div>角色：{roleLabel(u.role)}</div>
+              </div>
+            </div>
+            {u.role === "engineer" && (
+              <div className="mt-4 bg-white border border-slate-200 rounded-2xl p-4">
+                <div className="text-xs text-slate-400 mb-3">匯款核對資料</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600">
+                  {bankInfo.map((item) => (
+                    <div key={item.label}><span className="text-xs text-slate-400 block">{item.label}</span>{item.value}</div>
+                  ))}
+                </div>
+                <div className="mt-3">
+                  {u.bankBookPhoto ? (
+                    <img src={u.bankBookPhoto} alt="戶頭照片" className="w-full max-w-md rounded-2xl border border-slate-200" />
+                  ) : (
+                    <div className="text-xs text-slate-400">尚未上傳戶頭照片</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-xs text-slate-400">最近案件</div>
+                  <div className="text-xs text-slate-400">{recentMemberJobs.length} 筆</div>
+                </div>
+                {recentMemberJobs.length === 0 ? (
+                  <div className="text-xs text-slate-400">沒有案件紀錄</div>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {recentMemberJobs.map((j) => (
+                      <button key={j.id} onClick={() => setInspectJob(j)} className="w-full text-left bg-slate-50 border border-slate-200 rounded-2xl p-3 hover:bg-slate-100">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-800 truncate">{j.title}</div>
+                            <div className="text-[10px] text-slate-400 mt-1">{JOB_STATUS_LABEL[j.status] || j.status || "-"} · {getJobNextAction(j)}</div>
+                          </div>
+                          <div className="font-bold text-indigo-700 font-num">{formatCurrency(calcJobTotal(j))}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-xs text-slate-400">最近提領</div>
+                  <div className="text-xs text-slate-400">{recentMemberWithdrawals.length} 筆</div>
+                </div>
+                {recentMemberWithdrawals.length === 0 ? (
+                  <div className="text-xs text-slate-400">沒有提領紀錄</div>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {recentMemberWithdrawals.map((w) => (
+                      <button key={w.id} onClick={() => setSelectedWithdrawal(w)} className="w-full text-left bg-slate-50 border border-slate-200 rounded-2xl p-3 hover:bg-slate-100">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-800 truncate">{withdrawalStatusLabel(w.status)}</div>
+                            <div className="text-[10px] text-slate-400 mt-1">{w.createdAt ? new Date(w.createdAt).toLocaleString() : "-"}</div>
+                          </div>
+                          <div className="font-bold text-emerald-700 font-num">{formatCurrency(w.amount)}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-400 mb-2">金流摘要</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div>訂金已收：{formatCurrency(memberDepositTotal)}</div>
+                <div>尾款已收：{formatCurrency(memberTailTotal)}</div>
+                <div>提領已匯：{formatCurrency(memberWithdrawnTotal)}</div>
+                <div>待收尾款：{formatCurrency(memberPendingTail)}</div>
+              </div>
+            </div>
+          </div>
+          <div className="p-6 border-t flex flex-col md:flex-row gap-3">
             <button onClick={() => { setEditUser(u); onClose(); }} className="flex-1 btn btn-outline">編輯會員</button>
             <button onClick={onClose} className="flex-1 btn btn-primary">關閉</button>
           </div>
@@ -4221,6 +5471,8 @@ const AdminView = ({ user }) => {
     };
 
     const total = calcJobTotal(form);
+    const draftRisk = getJobRiskState(form);
+    const draftNextAction = getJobNextAction(form);
 
     return (
       <div className="fixed inset-0 z-[220] bg-black/50 flex items-start justify-center p-4 py-6 overflow-y-auto">
@@ -4231,6 +5483,21 @@ const AdminView = ({ user }) => {
               <h3 className="font-bold text-lg">編輯工單</h3>
             </div>
             <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-400">風險</div>
+              <div className={`text-lg font-bold ${draftRisk.tone === "danger" ? "text-rose-600" : draftRisk.tone === "warning" ? "text-amber-600" : "text-emerald-600"}`}>{draftRisk.label}</div>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-400">下一步</div>
+              <div className="text-lg font-bold text-indigo-700">{draftNextAction}</div>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-400">時間軸</div>
+              <StatusTimeline status={form.status || "open"} />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -4383,6 +5650,9 @@ const AdminView = ({ user }) => {
     const total = calcJobTotal(j);
     const dep = Number(j.depositAmount) || calcDeposit(total);
     const tail = Number(j.tailAmount) || calcTail(total);
+    const jobRisk = getJobRiskState(j);
+    const jobNextAction = getJobNextAction(j);
+    const jobAgeDays = getJobAgeDays(j);
 
     return (
       <div className="fixed inset-0 z-[220] bg-black/50 flex items-start justify-center p-4 py-6 overflow-y-auto">
@@ -4420,6 +5690,23 @@ const AdminView = ({ user }) => {
               <div className="text-xs text-slate-400 mt-2">建立 {j.created_at ? new Date(j.created_at).toLocaleString() : "-"}</div>
             </div>
           </div>
+          <div className="px-6 pb-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">案件年齡</div>
+              <div className={`text-lg font-bold ${jobRisk.tone === "danger" ? "text-rose-600" : "text-slate-800"}`}>{jobAgeDays} 天</div>
+              <div className="text-xs text-slate-400 mt-2">SLA：{getJobSlaDays(j.status)} 天內完成當前階段</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">下一步</div>
+              <div className="text-lg font-bold text-indigo-700">{jobNextAction}</div>
+              <div className="text-xs text-slate-400 mt-2">客戶、工程師、管理端都以這個動作為主。</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">風險狀態</div>
+              <div className={`text-lg font-bold ${jobRisk.tone === "danger" ? "text-rose-600" : jobRisk.tone === "warning" ? "text-amber-600" : "text-emerald-600"}`}>{jobRisk.label}</div>
+              <div className="text-xs text-slate-400 mt-2">用來判斷是否需要催案或催驗收。</div>
+            </div>
+          </div>
 
           <div className="px-6 pb-2">
             <div className="text-xs text-slate-400 mb-2">案件流程時間軸</div>
@@ -4445,7 +5732,40 @@ const AdminView = ({ user }) => {
             </div>
           </div>
 
-          <div className="p-6 border-t flex gap-3">
+          {(j.supplementAt || j.supplementNote || (j.supplementPhotos || []).length > 0) && (
+            <div className="px-6 pb-2">
+              <div className="card-modern p-4">
+                <div className="text-xs font-bold text-slate-400 uppercase mb-2">工程師補件</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600">
+                  <div><span className="text-xs text-slate-400 block">補件時間</span>{j.supplementAt ? new Date(j.supplementAt).toLocaleString() : "-"}</div>
+                  <div><span className="text-xs text-slate-400 block">補件人</span>{getUserName(j.supplementBy, j.supplementBy) || "-"}</div>
+                  <div className="md:col-span-2"><span className="text-xs text-slate-400 block">補件說明</span>{j.supplementNote || "無"}</div>
+                </div>
+                {(j.supplementPhotos || []).length > 0 && (
+                  <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
+                    {(j.supplementPhotos || []).map((p, i) => (
+                      <div key={i} className="w-20 h-20 rounded-xl overflow-hidden border shrink-0">
+                        <img src={p} className="w-20 h-20 object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="p-6 border-t flex flex-col md:flex-row gap-3">
+            <button onClick={() => updateJobAudit(j, "approved", "管理端工單稽核通過")} className="flex-1 btn btn-primary">通過稽核</button>
+            <button
+              onClick={() => {
+                const note = window.prompt("請輸入稽核補件說明", j.auditNote || "");
+                if (note === null) return;
+                updateJobAudit(j, "needs_fix", note.trim());
+              }}
+              className="flex-1 btn btn-danger"
+            >
+              需補件
+            </button>
             <button onClick={() => { setEditJob(j); onClose(); }} className="flex-1 btn btn-outline">編輯工單</button>
             <button onClick={onClose} className="flex-1 btn btn-primary">關閉</button>
           </div>
@@ -4453,8 +5773,290 @@ const AdminView = ({ user }) => {
       </div>
     );
   };
+
+  const WithdrawalInspectModal = ({ data, onClose }) => {
+    if (!data) return null;
+    const target = getUserById(data.userId);
+    const relatedWithdrawals = withdrawals.filter((w) => w.userId === data.userId);
+    const relatedJobs = jobs.filter((j) => j.assignee === data.userId);
+    const completedJobs = relatedJobs.filter((j) => j.status === "closed");
+    const pendingJobs = relatedJobs.filter((j) => j.status !== "closed");
+    const submittedTotal = relatedWithdrawals.reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+    const pendingTotal = relatedWithdrawals.filter((w) => w.status === "pending").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+    const approvedTotal = relatedWithdrawals.filter((w) => w.status === "approved").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+    const paidTotal = relatedWithdrawals.filter((w) => w.status === "paid").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+
+    return (
+      <div className="fixed inset-0 z-[240] bg-black/50 flex items-start justify-center p-4 py-6 overflow-y-auto">
+        <div className="bg-white w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl max-h-[92vh] overflow-y-auto">
+          <div className="p-6 border-b flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs text-slate-400 font-mono">{data.id}</div>
+              <div className="flex flex-wrap items-center gap-2 mt-1">
+                <h3 className="font-bold text-lg text-slate-800 truncate">{target?.name || data.userId}</h3>
+                <span className="px-2 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">{withdrawalStatusLabel(data.status)}</span>
+                <span className="px-2 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700">{data.speed === "fast" ? "閃電提領" : "標準提領"}</span>
+              </div>
+              <div className="text-xs text-slate-500 mt-2">可查看銀行資料、關聯案件、時間線與審核動作。</div>
+            </div>
+            <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+          </div>
+
+          <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">申請金額</div>
+              <div className="text-2xl font-bold text-indigo-700 font-num">{formatCurrency(data.amount)}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">工程師餘額</div>
+              <div className="text-2xl font-bold text-emerald-600 font-num">{formatCurrency(Number(target?.wallet) || 0)}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">關聯案件</div>
+              <div className="text-2xl font-bold text-slate-900 font-num">{relatedJobs.length}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">已結案案件</div>
+              <div className="text-2xl font-bold text-slate-900 font-num">{completedJobs.length}</div>
+            </div>
+          </div>
+
+          <div className="px-6 pb-2 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">累計提領</div>
+              <div className="font-bold text-slate-800 font-num">{formatCurrency(submittedTotal)}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">申請中</div>
+              <div className="font-bold text-amber-600 font-num">{formatCurrency(pendingTotal)}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">已核准待匯</div>
+              <div className="font-bold text-slate-700 font-num">{formatCurrency(approvedTotal)}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">已匯款</div>
+              <div className="font-bold text-emerald-600 font-num">{formatCurrency(paidTotal)}</div>
+            </div>
+          </div>
+
+          <div className="px-6 pb-2 grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div className="card-modern p-4">
+              <div className="text-xs font-bold text-slate-400 uppercase mb-2">銀行核對資料</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600">
+                <div><span className="text-xs text-slate-400 block">銀行名稱</span>{data.bankName || target?.bankName || "-"}</div>
+                <div><span className="text-xs text-slate-400 block">銀行代碼</span>{data.bankCode || target?.bankCode || "-"}</div>
+                <div><span className="text-xs text-slate-400 block">帳號</span>{data.accountNo || target?.accountNo || "-"}</div>
+                <div><span className="text-xs text-slate-400 block">戶名</span>{data.accountName || target?.accountName || "-"}</div>
+                <div><span className="text-xs text-slate-400 block">提領帳戶</span>{data.withdrawAccount || target?.withdrawAccount || "-"}</div>
+                <div><span className="text-xs text-slate-400 block">工程師狀態</span>{userStatusLabel(target?.status)}</div>
+              </div>
+              <div className="mt-3">
+                {data.bankBookPhoto || target?.bankBookPhoto ? (
+                  <img src={data.bankBookPhoto || target?.bankBookPhoto} alt="戶頭照片" className="w-full max-w-md rounded-2xl border border-slate-200" />
+                ) : (
+                  <div className="text-xs text-slate-400">尚無戶頭照片</div>
+                )}
+              </div>
+            </div>
+
+            <div className="card-modern p-4">
+              <div className="text-xs font-bold text-slate-400 uppercase mb-2">審核時間軸</div>
+              <div className="space-y-2 text-sm text-slate-600">
+                <div>申請時間：{data.createdAt ? new Date(data.createdAt).toLocaleString() : "-"}</div>
+                <div>預計匯款：{data.scheduledAt ? new Date(data.scheduledAt).toLocaleString() : "-"}</div>
+                <div>審核時間：{data.reviewedAt ? new Date(data.reviewedAt).toLocaleString() : "-"}</div>
+                <div>匯款時間：{data.paidAt ? new Date(data.paidAt).toLocaleString() : "-"}</div>
+                <div>審核人：{getUserName(data.reviewerId, data.reviewerId) || "-"}</div>
+                <div>匯款人：{getUserName(data.paidBy, data.paidBy) || "-"}</div>
+                <div className="pt-2">
+                  <div className="text-xs text-slate-400 mb-1">備註</div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 min-h-[72px]">{data.note || "無"}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 pb-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="card-modern p-4">
+              <div className="text-xs font-bold text-slate-400 uppercase mb-2">關聯案件</div>
+              {relatedJobs.length === 0 ? (
+                <div className="text-sm text-slate-400">沒有相關案件</div>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {relatedJobs.slice(0, 6).map((j) => (
+                    <button key={j.id} onClick={() => setInspectJob(j)} className="w-full text-left bg-white border border-slate-200 rounded-2xl p-3 hover:bg-slate-50">
+                      <div className="font-bold text-slate-800 truncate">{j.title}</div>
+                      <div className="text-xs text-slate-500 mt-1">{JOB_STATUS_LABEL[j.status] || j.status || "-"} · {formatCurrency(calcJobTotal(j))}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="card-modern p-4">
+              <div className="text-xs font-bold text-slate-400 uppercase mb-2">工程師提領歷史</div>
+              {relatedWithdrawals.length === 0 ? (
+                <div className="text-sm text-slate-400">沒有提領紀錄</div>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {relatedWithdrawals.slice(0, 8).map((w) => (
+                    <button key={w.id} onClick={() => setSelectedWithdrawal(w)} className={`w-full text-left bg-white border rounded-2xl p-3 hover:bg-slate-50 ${w.id === data.id ? "border-indigo-300 ring-2 ring-indigo-100" : "border-slate-200"}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-800 truncate">{withdrawalStatusLabel(w.status)}</div>
+                          <div className="text-xs text-slate-500 mt-1">{w.createdAt ? new Date(w.createdAt).toLocaleString() : "-"}</div>
+                        </div>
+                        <div className="font-bold text-indigo-700 font-num">{formatCurrency(w.amount)}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="p-6 border-t flex flex-col md:flex-row gap-3">
+            {data.status === "pending" && (
+              <>
+                <button onClick={() => approveWithdrawal(data)} className="flex-1 btn btn-primary">核准待匯</button>
+                <button onClick={() => rejectWithdrawal(data)} className="flex-1 btn btn-danger">拒絕/退回</button>
+              </>
+            )}
+            {data.status === "approved" && (
+              <button onClick={() => markWithdrawalPaid(data)} className="flex-1 btn btn-outline">標記已匯款</button>
+            )}
+            {(data.status === "paid" || data.status === "rejected") && (
+              <div className="flex-1 py-3 px-4 rounded-xl bg-slate-50 text-slate-600 text-sm font-bold text-center">
+                {data.status === "paid" ? "此提領已完成匯款" : "此提領已拒絕/退回"}
+              </div>
+            )}
+            <button onClick={onClose} className="flex-1 btn btn-outline">關閉</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
   const pendingEngineers = useMemo(() => engineers.filter((u) => String(u.status || "") === "pending"), [engineers]);
   const pendingWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "pending"), [withdrawals]);
+  const approvedWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "approved"), [withdrawals]);
+  const paidWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "paid"), [withdrawals]);
+  const rejectedWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "rejected"), [withdrawals]);
+  const messageThreads = useMemo(() => {
+    return jobs
+      .map((j) => {
+        const msgs = Array.isArray(j.messages) ? j.messages : [];
+        if (msgs.length === 0) return null;
+        const last = msgs[msgs.length - 1];
+        const peer = getUserName(j.clientId, j.clientName) || getUserName(j.assignee) || "-";
+        return {
+          job: j,
+          count: msgs.length,
+          lastTs: last?.ts || j.created_at || "",
+          preview: last?.text ? String(last.text).slice(0, 60) : "尚無訊息",
+          peer,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => String(b.lastTs).localeCompare(String(a.lastTs)));
+  }, [jobs]);
+  const messageThreadsToday = useMemo(() => {
+    return messageThreads.filter((t) => t.lastTs && new Date(t.lastTs).toLocaleDateString() === todayKey);
+  }, [messageThreads, todayKey]);
+  const jobAuditQueue = useMemo(() => {
+    return jobs
+      .map((j) => {
+        const issues = [];
+        const risk = getJobRiskState(j);
+        const jobPhotos = Array.isArray(j.photos) ? j.photos : [];
+        if (j.status === "open" && !j.assignee) issues.push("未指派");
+        if (j.status === "active" && !j.techArrived) issues.push("未打卡");
+        if (j.status === "active" && j.techArrived && jobPhotos.length === 0) issues.push("完工照片不足");
+        if (j.status === "active" && j.techArrived && !j.signature) issues.push("缺少簽名");
+        if (j.status === "completed") issues.push("待客戶驗收");
+        if (j.status === "closed" && j.acceptanceFlag) issues.push("驗收異常");
+        if (j.status === "closed" && !j.acceptanceAt) issues.push("缺驗收紀錄");
+        if (j.auditStatus === "needs_fix" && !(j.supplementAt || (Array.isArray(j.supplementPhotos) && j.supplementPhotos.length > 0))) issues.push("稽核需補件");
+        if (j.supplementAt && j.auditStatus === "unreviewed") issues.push("工程師已補件待複查");
+        if (risk.tone === "danger") issues.push("已逾 SLA");
+        return { job: j, issues, risk };
+      })
+      .filter((row) => row.issues.length > 0)
+      .sort((a, b) => b.issues.length - a.issues.length || getJobAgeDays(b.job) - getJobAgeDays(a.job))
+      .slice(0, 8);
+  }, [jobs]);
+
+  const paymentJobs = useMemo(() => jobs.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()), [jobs]);
+  const depositCollectedTotal = useMemo(() => {
+    return jobs.reduce((acc, j) => {
+      if (!j.deposit_paid) return acc;
+      const total = calcJobTotal(j);
+      return acc + (Number(j.depositAmount) || calcDeposit(total));
+    }, 0);
+  }, [jobs]);
+  const tailCollectedTotal = useMemo(() => {
+    return jobs.reduce((acc, j) => {
+      if (!(j.status === "closed" || j.tail_paid || j.paidAt)) return acc;
+      const total = calcJobTotal(j);
+      const dep = Number(j.depositAmount) || calcDeposit(total);
+      return acc + (Number(j.tailAmount) || (total - dep));
+    }, 0);
+  }, [jobs]);
+  const pendingTailTotal = useMemo(() => {
+    return jobs.reduce((acc, j) => {
+      if (j.status === "closed" || j.tail_paid) return acc;
+      const total = calcJobTotal(j);
+      const dep = Number(j.depositAmount) || calcDeposit(total);
+      return acc + (Number(j.tailAmount) || (total - dep));
+    }, 0);
+  }, [jobs]);
+  const withdrawalPendingTotal = useMemo(() => pendingWithdrawals.reduce((acc, w) => acc + (Number(w.amount) || 0), 0), [pendingWithdrawals]);
+  const withdrawalApprovedTotal = useMemo(() => approvedWithdrawals.reduce((acc, w) => acc + (Number(w.amount) || 0), 0), [approvedWithdrawals]);
+  const withdrawalPaidTotal = useMemo(() => paidWithdrawals.reduce((acc, w) => acc + (Number(w.amount) || 0), 0), [paidWithdrawals]);
+  const withdrawalRejectedTotal = useMemo(() => rejectedWithdrawals.reduce((acc, w) => acc + (Number(w.amount) || 0), 0), [rejectedWithdrawals]);
+  const platformNetCash = depositCollectedTotal + tailCollectedTotal - withdrawalPaidTotal;
+  const overdueJobs = useMemo(() => jobs.filter((j) => getJobRiskState(j).tone === "danger"), [jobs]);
+  const unassignedJobs = useMemo(() => jobs.filter((j) => j.status === "open" && !j.assignee), [jobs]);
+  const waitingAcceptanceJobs = useMemo(() => jobs.filter((j) => j.status === "completed"), [jobs]);
+  const activeNoArrivalJobs = useMemo(() => jobs.filter((j) => j.status === "active" && !j.techArrived), [jobs]);
+  const topClients = useMemo(() => {
+    return clients
+      .map((c) => {
+        const memberJobs = jobs.filter((j) => j.clientId === c.id);
+        const paidJobs = memberJobs.filter((j) => j.status === "closed");
+        const total = paidJobs.reduce((acc, j) => acc + calcJobTotal(j), 0);
+        return {
+          ...c,
+          jobs: memberJobs.length,
+          closed: paidJobs.length,
+          total,
+          avg: memberJobs.length ? Math.round(total / memberJobs.length) : 0,
+        };
+      })
+      .sort((a, b) => b.total - a.total || b.jobs - a.jobs)
+      .slice(0, 5);
+  }, [clients, jobs]);
+  const topEngineers = useMemo(() => {
+    return engineers
+      .map((e) => {
+        const memberJobs = jobs.filter((j) => j.assignee === e.id);
+        const closedJobs = memberJobs.filter((j) => j.status === "closed");
+        const pendingWithdrawals = withdrawals.filter((w) => w.userId === e.id && w.status === "pending").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+        const paidWithdrawals = withdrawals.filter((w) => w.userId === e.id && w.status === "paid").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+        return {
+          ...e,
+          jobs: memberJobs.length,
+          closed: closedJobs.length,
+          pendingWithdrawals,
+          paidWithdrawals,
+        };
+      })
+      .sort((a, b) => b.closed - a.closed || b.jobs - a.jobs)
+      .slice(0, 5);
+  }, [engineers, jobs, withdrawals]);
+  const inventoryItems = useMemo(() => inventory.map(normalizeInventoryItem), [inventory]);
+  const lowStockInventory = useMemo(() => inventoryItems.filter((item) => Number(item.quantity) <= Number(item.minQuantity)), [inventoryItems]);
+  const inventoryValue = useMemo(() => inventoryItems.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.cost) || 0), 0), [inventoryItems]);
 
   const ReportsPanel = () => {
     return (
@@ -4516,8 +6118,615 @@ const AdminView = ({ user }) => {
     );
   };
 
+  const InventoryPanel = () => {
+    const [query, setQuery] = useState("");
+    const [lowOnly, setLowOnly] = useState(false);
+    const [editingId, setEditingId] = useState(null);
+    const [form, setForm] = useState({
+      name: "",
+      category: "一般",
+      unit: "個",
+      quantity: 0,
+      minQuantity: 0,
+      location: "",
+      supplier: "",
+      cost: 0,
+      note: "",
+    });
+
+    const items = useMemo(
+      () =>
+        inventory
+          .map(normalizeInventoryItem)
+          .sort((a, b) => String(a.category || "").localeCompare(String(b.category || ""), "zh-Hant") || String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant")),
+      [inventory]
+    );
+
+    const stats = useMemo(() => {
+      const low = items.filter((i) => Number(i.quantity) <= Number(i.minQuantity));
+      const value = items.reduce((acc, i) => acc + (Number(i.quantity) || 0) * (Number(i.cost) || 0), 0);
+      const qty = items.reduce((acc, i) => acc + (Number(i.quantity) || 0), 0);
+      return { lowCount: low.length, value, qty, total: items.length };
+    }, [items]);
+
+    const filtered = items.filter((i) => {
+      const hay = [i.name, i.category, i.location, i.supplier, i.unit, i.note].filter(Boolean).join(" ").toLowerCase();
+      const matchesQuery = !query.trim() || hay.includes(query.trim().toLowerCase());
+      const matchesLow = !lowOnly || Number(i.quantity) <= Number(i.minQuantity);
+      return matchesQuery && matchesLow;
+    });
+
+    const clearForm = () => {
+      setEditingId(null);
+      setForm({ name: "", category: "一般", unit: "個", quantity: 0, minQuantity: 0, location: "", supplier: "", cost: 0, note: "" });
+    };
+
+    const startEdit = (item) => {
+      setEditingId(item.id);
+      setForm({
+        name: item.name || "",
+        category: item.category || "一般",
+        unit: item.unit || "個",
+        quantity: Number(item.quantity) || 0,
+        minQuantity: Number(item.minQuantity) || 0,
+        location: item.location || "",
+        supplier: item.supplier || "",
+        cost: Number(item.cost) || 0,
+        note: item.note || "",
+      });
+    };
+
+    const saveItem = () => {
+      if (!String(form.name || "").trim()) {
+        addToast("請輸入倉庫品項名稱", "error");
+        return;
+      }
+      const next = normalizeInventoryItem({
+        id: editingId || `S-${Date.now()}`,
+        ...form,
+        quantity: Number(form.quantity) || 0,
+        minQuantity: Number(form.minQuantity) || 0,
+        cost: Number(form.cost) || 0,
+        updatedAt: new Date().toISOString(),
+      });
+      setInventory((prev) => {
+        const map = new Map(prev.map((item) => [item.id, item]));
+        map.set(next.id, next);
+        return Array.from(map.values()).map(normalizeInventoryItem);
+      });
+      logAudit(editingId ? "update_inventory_item" : "create_inventory_item", `${next.id} ${next.name}`);
+      addToast(editingId ? "已更新倉庫品項" : "已新增倉庫品項", "success");
+      clearForm();
+    };
+
+    const adjustQty = (item, delta) => {
+      setInventory((prev) =>
+        prev.map((row) =>
+          row.id === item.id
+            ? normalizeInventoryItem({ ...row, quantity: Math.max(0, (Number(row.quantity) || 0) + delta), updatedAt: new Date().toISOString() })
+            : row
+        )
+      );
+      logAudit("adjust_inventory_qty", `${item.id} delta=${delta}`);
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="card-modern p-5">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">倉庫管理</h2>
+              <div className="text-sm text-slate-500 mt-1">管理庫存、低庫存警示、品項新增與補貨調整</div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { clearForm(); }} className="btn btn-outline px-4 py-2 rounded-xl">新增品項</button>
+              <button onClick={() => downloadText(`inventory_${new Date().toISOString().slice(0, 10)}.csv`, toCSV(items.map((i) => ({ 品項: i.name, 類別: i.category, 單位: i.unit, 數量: i.quantity, 最低庫存: i.minQuantity, 地點: i.location, 供應商: i.supplier, 單價: i.cost, 更新時間: i.updatedAt }))), "text/csv;charset=utf-8")} className="btn btn-outline px-4 py-2 rounded-xl">匯出 CSV</button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">品項數</div>
+              <div className="text-2xl font-bold text-slate-900 font-num">{stats.total}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">低庫存</div>
+              <div className="text-2xl font-bold text-rose-600 font-num">{stats.lowCount}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">總數量</div>
+              <div className="text-2xl font-bold text-indigo-700 font-num">{stats.qty}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">估算庫存價值</div>
+              <div className="text-2xl font-bold text-emerald-600 font-num">{formatCurrency(stats.value)}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+            <div className="md:col-span-2">
+              <label className="text-xs font-bold text-slate-500 block mb-1">搜尋</label>
+              <input className="input-modern" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="品項 / 類別 / 位置 / 供應商" />
+            </div>
+            <div className="flex items-end">
+              <button onClick={() => setLowOnly((v) => !v)} className={`w-full px-4 py-3 rounded-xl font-bold border ${lowOnly ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-white text-slate-600 border-slate-200"}`}>
+                {lowOnly ? "顯示全部" : "只看低庫存"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="card-modern p-6">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 className="font-bold text-slate-800">{editingId ? "編輯倉庫品項" : "新增倉庫品項"}</h3>
+              <div className="text-xs text-slate-400 mt-1">{editingId ? `編輯中：${editingId}` : "新增後可立即在倉庫表單調整數量"}</div>
+            </div>
+            {editingId && <button onClick={clearForm} className="btn btn-outline px-4 py-2 rounded-xl">取消編輯</button>}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="md:col-span-2">
+              <label className="text-xs font-bold text-slate-500 block mb-1">品項名稱</label>
+              <input className="input-modern" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="例如：Cat.6 網路線" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">類別</label>
+              <input className="input-modern" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="網路耗材 / 監控設備" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">單位</label>
+              <input className="input-modern" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="箱 / 台 / 組" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">數量</label>
+              <input className="input-modern" type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) || 0 })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">最低庫存</label>
+              <input className="input-modern" type="number" value={form.minQuantity} onChange={(e) => setForm({ ...form, minQuantity: Number(e.target.value) || 0 })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">單價</label>
+              <input className="input-modern" type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: Number(e.target.value) || 0 })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">位置</label>
+              <input className="input-modern" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="A1-01" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">供應商</label>
+              <input className="input-modern" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="供應商名稱" />
+            </div>
+            <div className="md:col-span-3">
+              <label className="text-xs font-bold text-slate-500 block mb-1">備註</label>
+              <textarea className="input-modern h-20 resize-none" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="可填寫備品說明、採購資訊、特殊保存條件" />
+            </div>
+          </div>
+          <div className="mt-4 flex gap-3">
+            <button onClick={saveItem} className="btn btn-primary px-4 py-3 rounded-xl">{editingId ? "更新品項" : "新增品項"}</button>
+            <button onClick={clearForm} className="btn btn-outline px-4 py-3 rounded-xl">清空</button>
+          </div>
+        </div>
+
+            <div className="card-modern overflow-hidden">
+              <div className="overflow-x-scroll pb-2">
+            <table className="min-w-[1200px] w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500 border-b sticky top-0">
+                <tr>
+                  <th className="p-4">品項</th>
+                  <th className="p-4">類別 / 位置</th>
+                  <th className="p-4">庫存</th>
+                  <th className="p-4">最低</th>
+                  <th className="p-4">供應商</th>
+                  <th className="p-4">單價</th>
+                  <th className="p-4">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((item) => {
+                  const low = Number(item.quantity) <= Number(item.minQuantity);
+                  return (
+                    <tr key={item.id} className="border-b hover:bg-slate-50 align-top">
+                      <td className="p-4">
+                        <div className="font-bold text-slate-800">{item.name}</div>
+                        <div className="text-xs text-slate-400 mt-1">{item.id}</div>
+                        <div className="text-xs text-slate-500 mt-1">{item.note || "-"}</div>
+                      </td>
+                      <td className="p-4 text-slate-700">
+                        <div>{item.category}</div>
+                        <div className="text-xs text-slate-400 mt-1">{item.location || "-"}</div>
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${low ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>
+                          {item.quantity} {item.unit}
+                        </span>
+                      </td>
+                      <td className="p-4 text-slate-700 font-bold">{item.minQuantity} {item.unit}</td>
+                      <td className="p-4 text-slate-700">{item.supplier || "-"}</td>
+                      <td className="p-4 text-indigo-700 font-bold font-num">{formatCurrency(item.cost)}</td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => adjustQty(item, -1)} className="btn btn-outline px-3 py-2 rounded-xl">-1</button>
+                          <button onClick={() => adjustQty(item, 1)} className="btn btn-outline px-3 py-2 rounded-xl">+1</button>
+                          <button onClick={() => startEdit(item)} className="btn btn-primary px-3 py-2 rounded-xl">編輯</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {filtered.length === 0 && <div className="p-6 text-sm text-slate-400">沒有符合條件的倉庫品項</div>}
+        </div>
+      </div>
+    );
+  };
+
+  const FinancePanel = () => {
+    const paymentRows = paymentJobs.map((j) => {
+      const total = calcJobTotal(j);
+      const deposit = Number(j.depositAmount) || calcDeposit(total);
+      const tail = Number(j.tailAmount) || calcTail(total);
+      return {
+        案件編號: j.id,
+        客戶ID: j.clientId || "",
+        工程師ID: j.assignee || "",
+        狀態代碼: j.status,
+        案件標題: j.title || "-",
+        客戶: getUserName(j.clientId, j.clientName) || "-",
+        工程師: getUserName(j.assignee) || "-",
+        狀態: JOB_STATUS_LABEL[j.status] || j.status || "-",
+        付款進度: financePaymentLabel(j),
+        總金額: total,
+        已收訂金: j.deposit_paid ? deposit : 0,
+        訂金狀態: j.deposit_paid ? "已收" : "未收",
+        尾款金額: tail,
+        尾款狀態: j.tail_paid ? "已收" : "未收",
+        驗收狀態: j.acceptanceFlag ? "異常" : (j.status === "closed" ? "正常" : "未驗收"),
+        建立時間: j.created_at ? new Date(j.created_at).toLocaleString() : "-",
+        結案時間: j.paidAt ? new Date(j.paidAt).toLocaleString() : "-",
+      };
+    });
+
+    const withdrawalRows = withdrawals
+      .slice()
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .map((w) => {
+        const target = getUserById(w.userId);
+        return {
+          提領編號: w.id,
+          狀態代碼: w.status,
+          工程師: target?.name || w.userId || "-",
+          狀態: withdrawalStatusLabel(w.status),
+          金額: Number(w.amount) || 0,
+          方式: w.speed === "fast" ? "閃電提領" : "標準提領",
+          銀行名稱: w.bankName || target?.bankName || "-",
+          銀行代碼: w.bankCode || target?.bankCode || "-",
+          帳號: w.accountNo || target?.accountNo || "-",
+          戶名: w.accountName || target?.accountName || "-",
+          提領帳戶: w.withdrawAccount || target?.withdrawAccount || "-",
+          戶頭照片: w.bankBookPhoto || target?.bankBookPhoto || "",
+          申請時間: w.createdAt ? new Date(w.createdAt).toLocaleString() : "-",
+          預計匯款: w.scheduledAt ? new Date(w.scheduledAt).toLocaleString() : "-",
+          審核時間: w.reviewedAt ? new Date(w.reviewedAt).toLocaleString() : "-",
+          匯款時間: w.paidAt ? new Date(w.paidAt).toLocaleString() : "-",
+          審核人: getUserName(w.reviewerId, w.reviewerId) || "-",
+          匯款人: getUserName(w.paidBy, w.paidBy) || "-",
+          備註: w.note || "",
+        };
+      });
+
+    const normalizedFinanceQuery = financeQuery.trim().toLowerCase();
+    const matchesFinanceQuery = (row, extraText = "") => {
+      if (!normalizedFinanceQuery) return true;
+      const hay = `${Object.values(row).join(" ")} ${extraText}`.toLowerCase();
+      return hay.includes(normalizedFinanceQuery);
+    };
+    const filteredPaymentRows = paymentRows.filter((row) => {
+      if (financePaymentStatus !== "all" && row.狀態代碼 !== financePaymentStatus) return false;
+      return matchesFinanceQuery(row);
+    });
+    const filteredWithdrawalRows = withdrawalRows.filter((row) => {
+      if (financeWithdrawalStatus !== "all" && row.狀態代碼 !== financeWithdrawalStatus) return false;
+      return matchesFinanceQuery(row);
+    });
+
+    const exportPayments = (format = "csv") => {
+      const stamp = new Date().toISOString().slice(0, 10);
+      if (format === "json") return downloadText(`finance_payments_${stamp}.json`, JSON.stringify(filteredPaymentRows, null, 2), "application/json;charset=utf-8");
+      return downloadText(`finance_payments_${stamp}.csv`, toCSV(filteredPaymentRows), "text/csv;charset=utf-8");
+    };
+
+    const exportWithdrawals = (format = "csv") => {
+      const stamp = new Date().toISOString().slice(0, 10);
+      if (format === "json") return downloadText(`finance_withdrawals_${stamp}.json`, JSON.stringify(filteredWithdrawalRows, null, 2), "application/json;charset=utf-8");
+      return downloadText(`finance_withdrawals_${stamp}.csv`, toCSV(filteredWithdrawalRows), "text/csv;charset=utf-8");
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="card-modern p-5">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">金流對帳</h2>
+              <div className="text-sm text-slate-500 mt-1">同時管理客戶付款、工程師提領、匯款與對帳報表</div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => exportPayments("csv")} className="btn btn-outline px-4 py-2 rounded-xl">匯出付款 CSV</button>
+              <button onClick={() => exportWithdrawals("csv")} className="btn btn-outline px-4 py-2 rounded-xl">匯出提領 CSV</button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 mt-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">客戶已收訂金</div>
+              <div className="text-2xl font-bold text-indigo-700 font-num">{formatCurrency(depositCollectedTotal)}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">客戶已收尾款</div>
+              <div className="text-2xl font-bold text-emerald-600 font-num">{formatCurrency(tailCollectedTotal)}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">工程師待提領</div>
+              <div className="text-2xl font-bold text-amber-600 font-num">{formatCurrency(withdrawalPendingTotal)}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">已核准待匯</div>
+              <div className="text-2xl font-bold text-slate-800 font-num">{formatCurrency(withdrawalApprovedTotal)}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">已拒絕提領</div>
+              <div className="text-2xl font-bold text-rose-600 font-num">{formatCurrency(withdrawalRejectedTotal)}</div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 mt-4">
+            <button onClick={() => setFinanceTab("payments")} className={`px-4 py-2 rounded-xl font-bold text-sm border ${financeTab === "payments" ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}>客戶付款狀況</button>
+            <button onClick={() => setFinanceTab("withdrawals")} className={`px-4 py-2 rounded-xl font-bold text-sm border ${financeTab === "withdrawals" ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}>工程師提領狀況</button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+            <div className="md:col-span-2">
+              <label className="text-xs font-bold text-slate-500 block mb-1">查詢</label>
+              <input
+                className="input-modern"
+                value={financeQuery}
+                onChange={(e) => setFinanceQuery(e.target.value)}
+                placeholder="案件 / 客戶 / 工程師 / 金額 / 帳號 / 備註"
+              />
+            </div>
+            {financeTab === "payments" ? (
+              <div>
+                <label className="text-xs font-bold text-slate-500 block mb-1">案件狀態</label>
+                <select className="input-modern" value={financePaymentStatus} onChange={(e) => setFinancePaymentStatus(e.target.value)}>
+                  <option value="all">全部</option>
+                  <option value="open">媒合中</option>
+                  <option value="active">施工中</option>
+                  <option value="completed">待驗收</option>
+                  <option value="closed">已結案</option>
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs font-bold text-slate-500 block mb-1">提領狀態</label>
+                <select className="input-modern" value={financeWithdrawalStatus} onChange={(e) => setFinanceWithdrawalStatus(e.target.value)}>
+                  <option value="all">全部</option>
+                  <option value="pending">申請中</option>
+                  <option value="approved">已核准待匯</option>
+                  <option value="paid">已匯款</option>
+                  <option value="rejected">已拒絕</option>
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {financeTab === "payments" && (
+          <div className="card-modern p-6">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="font-bold text-slate-800">客戶付款總表</h3>
+              <div className="flex gap-2">
+                <button onClick={() => exportPayments("csv")} className="btn btn-outline px-4 py-2 rounded-xl">CSV</button>
+                <button onClick={() => exportPayments("json")} className="btn btn-outline px-4 py-2 rounded-xl">JSON</button>
+              </div>
+            </div>
+            <div className="text-xs text-slate-400 mb-3">查詢結果：{filteredPaymentRows.length} 筆</div>
+            <div className="overflow-x-scroll pb-2">
+              <table className="min-w-[1400px] w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 border-b sticky top-0">
+                  <tr>
+                    <th className="p-4">案件</th>
+                    <th className="p-4">客戶</th>
+                    <th className="p-4">工程師</th>
+                    <th className="p-4">狀態</th>
+                    <th className="p-4">付款進度</th>
+                    <th className="p-4">總金額</th>
+                    <th className="p-4">訂金</th>
+                    <th className="p-4">尾款</th>
+                    <th className="p-4">驗收</th>
+                    <th className="p-4">建立/結案</th>
+                    <th className="p-4">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPaymentRows.map((row) => (
+                    <tr key={row.案件編號} className="border-b hover:bg-slate-50">
+                      <td className="p-4">
+                        <div className="font-bold text-slate-800">{row.案件標題}</div>
+                        <div className="text-xs text-slate-400 font-mono mt-1">{row.案件編號}</div>
+                      </td>
+                      <td className="p-4">{row.客戶}</td>
+                      <td className="p-4">{row.工程師}</td>
+                      <td className="p-4"><StatusBadge status={row.狀態代碼} /></td>
+                      <td className="p-4 text-slate-700">{row.付款進度}</td>
+                      <td className="p-4 font-bold text-indigo-700 font-num">{formatCurrency(row.總金額)}</td>
+                      <td className="p-4">
+                        <div className="font-bold text-emerald-600">{row.訂金狀態}</div>
+                        <div className="text-xs text-slate-400 font-num">{formatCurrency(row.已收訂金)}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-bold text-slate-700">{row.尾款狀態}</div>
+                        <div className="text-xs text-slate-400 font-num">{formatCurrency(row.尾款金額)}</div>
+                      </td>
+                      <td className="p-4 text-slate-700">{row.驗收狀態}</td>
+                      <td className="p-4 text-xs text-slate-500">
+                        <div>建立：{row.建立時間}</div>
+                        <div className="mt-1">結案：{row.結案時間}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-2">
+                          <button
+                            onClick={() => {
+                              const target = jobs.find((j) => j.id === row.案件編號);
+                              if (target) setInspectJob(target);
+                            }}
+                            className="btn btn-outline px-4 py-2 rounded-xl"
+                          >
+                            查看工單
+                          </button>
+                          <button
+                            onClick={() => {
+                              const client = users.find((u) => u.id === row.客戶ID);
+                              if (client) setInspectUser(client);
+                            }}
+                            className="btn btn-outline px-4 py-2 rounded-xl"
+                          >
+                            查看客戶
+                          </button>
+                          <button
+                            onClick={() => {
+                              const engineer = users.find((u) => u.id === row.工程師ID);
+                              if (engineer) setInspectUser(engineer);
+                            }}
+                            className="btn btn-outline px-4 py-2 rounded-xl"
+                          >
+                            查看工程師
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {financeTab === "withdrawals" && (
+          <div className="card-modern p-6">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="font-bold text-slate-800">工程師提領總表</h3>
+              <div className="flex gap-2">
+                <button onClick={() => exportWithdrawals("csv")} className="btn btn-outline px-4 py-2 rounded-xl">CSV</button>
+                <button onClick={() => exportWithdrawals("json")} className="btn btn-outline px-4 py-2 rounded-xl">JSON</button>
+              </div>
+            </div>
+            <div className="text-xs text-slate-400 mb-3">查詢結果：{filteredWithdrawalRows.length} 筆</div>
+            <div className="overflow-x-scroll pb-2">
+              <table className="min-w-[1500px] w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 border-b sticky top-0">
+                  <tr>
+                    <th className="p-4">工程師</th>
+                    <th className="p-4">金額</th>
+                    <th className="p-4">狀態</th>
+                    <th className="p-4">方式</th>
+                    <th className="p-4">帳戶</th>
+                    <th className="p-4">申請/預計/審核/匯款</th>
+                    <th className="p-4">審核人</th>
+                    <th className="p-4">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredWithdrawalRows.map((row) => {
+                    const target = withdrawals.find((w) => w.id === row.提領編號);
+                    return (
+                      <tr key={row.提領編號} className="border-b hover:bg-slate-50 align-top">
+                        <td className="p-4">
+                          <div className="font-bold text-slate-800">{row.工程師}</div>
+                          <div className="text-xs text-slate-400 font-mono mt-1">{row.提領編號}</div>
+                        </td>
+                        <td className="p-4 font-bold text-indigo-700 font-num">{formatCurrency(row.金額)}</td>
+                        <td className="p-4"><span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700">{row.狀態}</span></td>
+                        <td className="p-4 text-slate-700">{row.方式}</td>
+                        <td className="p-4 text-xs text-slate-600">
+                          <div>{row.銀行名稱}</div>
+                          <div>{row.銀行代碼}</div>
+                          <div>{row.帳號}</div>
+                          <div>{row.戶名}</div>
+                          {row.戶頭照片 ? (
+                            <img src={row.戶頭照片} alt="戶頭照片" className="mt-2 w-24 h-24 object-cover rounded-xl border border-slate-200" />
+                          ) : (
+                            <div className="mt-2 text-[10px] text-slate-400">無戶頭照片</div>
+                          )}
+                        </td>
+                        <td className="p-4 text-xs text-slate-500">
+                          <div>申請：{row.申請時間}</div>
+                          <div className="mt-1">預計匯款：{row.預計匯款}</div>
+                          <div className="mt-1">審核：{row.審核時間}</div>
+                          <div className="mt-1">匯款：{row.匯款時間}</div>
+                        </td>
+                        <td className="p-4 text-slate-700 text-xs">
+                          <div>審核：{row.審核人}</div>
+                          <div className="mt-1">匯款：{row.匯款人}</div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex flex-col gap-2">
+                            <button onClick={() => setSelectedWithdrawal(target || withdrawals.find((w) => w.id === row.提領編號) || null)} className="btn btn-outline px-4 py-2 rounded-xl">查看明細</button>
+                            {target && target.status === "pending" && (
+                              <>
+                                <button onClick={() => approveWithdrawal(target)} className="btn btn-primary px-4 py-2 rounded-xl">核准待匯</button>
+                                <button onClick={() => rejectWithdrawal(target)} className="btn btn-danger px-4 py-2 rounded-xl">拒絕</button>
+                              </>
+                            )}
+                            {target && target.status === "approved" && (
+                              <button onClick={() => markWithdrawalPaid(target)} className="btn btn-primary px-4 py-2 rounded-xl">標記已匯款</button>
+                            )}
+                            {target && target.status === "paid" && (
+                              <div className="text-xs text-emerald-600 font-bold">已完成匯款</div>
+                            )}
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-1">預計匯款時間</label>
+                              <input
+                                type="datetime-local"
+                                className="input-modern py-1.5 text-xs"
+                                value={target?.scheduledAt ? new Date(target.scheduledAt).toISOString().slice(0, 16) : ""}
+                                onChange={(e) => target && updateWithdrawal(target.id, { scheduledAt: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-1">備註</label>
+                              <input
+                                className="input-modern py-1.5 text-xs"
+                                value={target?.note || ""}
+                                onChange={(e) => target && updateWithdrawal(target.id, { note: e.target.value })}
+                                placeholder="匯款備註"
+                              />
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const dataHealth = useMemo(() => {
+    const missingEngineerProfile = users.filter((u) => roleGroup(u.role) === "engineer" && (!u.bankName || !u.accountNo || !u.accountName || !u.withdrawAccount)).length;
+    const missingClientProfile = users.filter((u) => roleGroup(u.role) === "client" && (!u.phone || !u.email)).length;
+    const jobsWithoutAssignee = jobs.filter((j) => j.status !== "open" && !j.assignee).length;
+    const jobsWithoutPhotos = jobs.filter((j) => (j.status === "completed" || j.status === "closed") && (!Array.isArray(j.photos) || j.photos.length === 0)).length;
+    return { missingEngineerProfile, missingClientProfile, jobsWithoutAssignee, jobsWithoutPhotos };
+  }, [jobs, users]);
+
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row md:h-screen md:overflow-hidden overflow-x-hidden">
       {showReport && <DailyReport onClose={() => setShowReport(false)} />}
       {editUser && <EditUserModal data={editUser} onClose={() => setEditUser(null)} />}
       {inspectUser && <UserInspectModal data={inspectUser} onClose={() => setInspectUser(null)} />}
@@ -4527,8 +6736,9 @@ const AdminView = ({ user }) => {
       {createJobOpen && <CreateJobModal onClose={() => setCreateJobOpen(false)} />}
       {importOpen && <ImportModal onClose={() => setImportOpen(false)} />}
       {auditOpen && <AuditModal onClose={() => setAuditOpen(false)} />}
+      {selectedWithdrawal && <WithdrawalInspectModal data={selectedWithdrawal} onClose={() => setSelectedWithdrawal(null)} />}
 
-      <aside className="w-full md:w-80 bg-white border-r p-6 flex flex-col">
+      <aside className="w-full md:w-80 bg-white border-r p-6 flex flex-col md:h-screen md:overflow-y-auto min-w-0">
         <div className="flex items-center gap-3 font-bold text-xl text-indigo-700 mb-6"><Icon name="cloud-lightning" /> 雲程中控</div>
 
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5">
@@ -4538,11 +6748,14 @@ const AdminView = ({ user }) => {
         </div>
 
         <nav className="space-y-1 flex-1">
-          {[
+          {[ 
             { id: "overview", label: "戰情儀表", icon: "layout-dashboard" },
             { id: "jobs", label: "全域工單", icon: "file-text" },
             { id: "users", label: "會員管理", icon: "users" },
             { id: "approvals", label: "審核中心", icon: "badge-check" },
+            { id: "inventory", label: "倉庫管理", icon: "package" },
+            { id: "messages", label: "訊息中心", icon: "message-square" },
+            { id: "finance", label: "金流對帳", icon: "wallet" },
             { id: "reports", label: "報表中心", icon: "bar-chart-3" },
             { id: "settings", label: "系統設定", icon: "settings" },
           ].map((i) => (
@@ -4571,7 +6784,7 @@ const AdminView = ({ user }) => {
         </button>
       </aside>
 
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+      <main className="flex-1 min-h-0 min-w-0 p-6 md:p-8 overflow-y-auto overflow-x-auto md:h-screen pb-28">
         {view === "overview" && (
           <>
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
@@ -4603,6 +6816,46 @@ const AdminView = ({ user }) => {
                 <div className="text-2xl font-bold text-indigo-700 font-num">{createdToday.length} / {closedToday.length}</div>
               </div>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4 mt-4">
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">客戶已收訂金</div>
+                <div className="text-xl font-bold text-indigo-700 font-num">{formatCurrency(depositCollectedTotal)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">客戶已收尾款</div>
+                <div className="text-xl font-bold text-emerald-600 font-num">{formatCurrency(tailCollectedTotal)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">客戶待收尾款</div>
+                <div className="text-xl font-bold text-rose-600 font-num">{formatCurrency(pendingTailTotal)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">工程師待提領</div>
+                <div className="text-xl font-bold text-amber-600 font-num">{formatCurrency(withdrawalPendingTotal)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">已核准待匯</div>
+                <div className="text-xl font-bold text-slate-700 font-num">{formatCurrency(withdrawalApprovedTotal)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">平台淨現金</div>
+                <div className="text-xl font-bold text-slate-900 font-num">{formatCurrency(platformNetCash)}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">倉庫品項</div>
+                <div className="text-2xl font-bold text-slate-900 font-num">{inventoryItems.length}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">低庫存警示</div>
+                <div className="text-2xl font-bold text-rose-600 font-num">{lowStockInventory.length}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">倉庫價值</div>
+                <div className="text-2xl font-bold text-emerald-600 font-num">{formatCurrency(inventoryValue)}</div>
+              </div>
+            </div>
             <div className="card-modern p-5 mt-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-sm font-bold text-slate-800">全域案件進度</div>
@@ -4612,6 +6865,24 @@ const AdminView = ({ user }) => {
                 <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-400" style={{ width: `${progressRatio}%` }} />
               </div>
               <div className="mt-2 text-xs text-slate-400">計算方式：已結案案件數 / 總案件數</div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">逾期案件</div>
+                <div className="text-2xl font-bold text-rose-600 font-num">{overdueJobs.length}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">未指派</div>
+                <div className="text-2xl font-bold text-amber-600 font-num">{unassignedJobs.length}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">待驗收</div>
+                <div className="text-2xl font-bold text-indigo-700 font-num">{waitingAcceptanceJobs.length}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">施工未打卡</div>
+                <div className="text-2xl font-bold text-slate-700 font-num">{activeNoArrivalJobs.length}</div>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4">
               <div className="card-modern p-5 md:col-span-2">
@@ -4633,6 +6904,95 @@ const AdminView = ({ user }) => {
                   <div className="text-xs text-slate-400">訂金 + 尾款</div>
                 </div>
                 <SimpleBarChart data={sevenDayRevenue} />
+              </div>
+            </div>
+
+            <div className="card-modern p-6 mt-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-slate-800">營運風險清單</h3>
+                  <div className="text-xs text-slate-400 mt-1">優先處理逾期、未指派、待驗收案件</div>
+                </div>
+                <div className="text-xs text-slate-500">只顯示前 5 筆高風險案件</div>
+              </div>
+              <div className="space-y-2">
+                {jobs
+                  .slice()
+                  .sort((a, b) => {
+                    const ra = getJobRiskState(a);
+                    const rb = getJobRiskState(b);
+                    const sa = ra.tone === "danger" ? 0 : ra.tone === "warning" ? 1 : 2;
+                    const sb = rb.tone === "danger" ? 0 : rb.tone === "warning" ? 1 : 2;
+                    return sa - sb || getJobAgeDays(b) - getJobAgeDays(a);
+                  })
+                  .filter((j) => getJobRiskState(j).tone !== "ok" || j.status !== "closed")
+                  .slice(0, 5)
+                  .map((j) => {
+                    const risk = getJobRiskState(j);
+                    return (
+                      <div key={j.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`text-xs px-2 py-1 rounded-full font-bold ${risk.tone === "danger" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{risk.label}</span>
+                            <div className="font-bold text-slate-800 truncate">{j.title}</div>
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1 truncate">
+                            {getUserName(j.clientId, j.clientName) || "-"} · {getJobNextAction(j)} · {getJobAgeDays(j)} 天
+                          </div>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <button onClick={() => setInspectJob(j)} className="btn btn-outline px-3 py-2 rounded-xl">查看</button>
+                          <button onClick={() => setEditJob(j)} className="btn btn-primary px-3 py-2 rounded-xl">處理</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
+              <div className="card-modern p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-slate-800">客戶營收排行</h3>
+                  <span className="text-xs text-slate-400">Top 5</span>
+                </div>
+                <div className="space-y-2">
+                  {topClients.map((c, idx) => (
+                    <div key={c.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-bold text-slate-800">#{idx + 1} {c.name}</div>
+                        <div className="text-xs text-slate-500 mt-1">案件 {c.jobs} | 已結案 {c.closed}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-indigo-700 font-num">{formatCurrency(c.total)}</div>
+                        <div className="text-xs text-slate-400">平均 {formatCurrency(c.avg)}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {topClients.length === 0 && <div className="text-sm text-slate-400">目前沒有客戶資料</div>}
+                </div>
+              </div>
+
+              <div className="card-modern p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-slate-800">工程師績效排行</h3>
+                  <span className="text-xs text-slate-400">Top 5</span>
+                </div>
+                <div className="space-y-2">
+                  {topEngineers.map((e, idx) => (
+                    <div key={e.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-bold text-slate-800">#{idx + 1} {e.name}</div>
+                        <div className="text-xs text-slate-500 mt-1">已完工 {e.closed} | 接案 {e.jobs}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-emerald-600 font-num">{formatCurrency(e.paidWithdrawals)}</div>
+                        <div className="text-xs text-slate-400">待審 {formatCurrency(e.pendingWithdrawals)}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {topEngineers.length === 0 && <div className="text-sm text-slate-400">目前沒有工程師資料</div>}
+                </div>
               </div>
             </div>
 
@@ -4724,7 +7084,7 @@ const AdminView = ({ user }) => {
             </div>
 
             <div className="card-modern overflow-hidden">
-              <div className="overflow-x-auto no-scrollbar">
+              <div className="overflow-x-scroll pb-2">
                 <table className="min-w-[1500px] w-full text-left text-sm">
                   <thead className="bg-slate-50 text-slate-500 border-b sticky top-0">
                     <tr>
@@ -4895,7 +7255,7 @@ const AdminView = ({ user }) => {
             </div>
 
             <div className="card-modern overflow-hidden">
-              <div className="overflow-x-auto no-scrollbar">
+              <div className="overflow-x-scroll pb-2">
                 <table className="min-w-[1200px] w-full text-left text-sm">
                   <thead className="bg-slate-50 text-slate-500 border-b sticky top-0">
                     <tr>
@@ -4982,7 +7342,26 @@ const AdminView = ({ user }) => {
               <button onClick={() => setView("users")} className="btn btn-outline px-4 py-2 rounded-xl">前往會員管理</button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="card-modern p-4">
+                <div className="text-xs text-slate-400">待審技師</div>
+                <div className="text-2xl font-bold text-amber-600 font-num">{pendingEngineers.length}</div>
+              </div>
+              <div className="card-modern p-4">
+                <div className="text-xs text-slate-400">待稽核工單</div>
+                <div className="text-2xl font-bold text-rose-600 font-num">{jobAuditQueue.length}</div>
+              </div>
+              <div className="card-modern p-4">
+                <div className="text-xs text-slate-400">待審提領</div>
+                <div className="text-2xl font-bold text-indigo-700 font-num">{pendingWithdrawals.length}</div>
+              </div>
+              <div className="card-modern p-4">
+                <div className="text-xs text-slate-400">需補件工單</div>
+                <div className="text-2xl font-bold text-slate-900 font-num">{jobAuditQueue.filter(({ job }) => String(job.auditStatus || "") === "needs_fix").length}</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
               <div className="card-modern p-6">
                 <h3 className="font-bold text-slate-800">待審核 ({pendingEngineers.length})</h3>
                 <div className="text-xs text-slate-400 mt-1">建議：確認姓名/電話/技能/年資，再按通過</div>
@@ -4999,12 +7378,53 @@ const AdminView = ({ user }) => {
                             <div className="text-xs text-slate-500 mt-1">{e.title || "-"} · {e.experience || "-"}</div>
                             <div className="text-xs text-slate-400 mt-1">{e.phone || "-"} · {e.email || "-"}</div>
                             <div className="text-xs text-slate-400 mt-1">技能：{Array.isArray(e.skills) ? e.skills.join(", ") : "-"}</div>
+                            <div className="text-xs text-slate-400 mt-1">銀行：{e.bankName || "-"} · {e.accountNo || "-"}</div>
+                            <div className="text-xs text-slate-400 mt-1">提領帳戶：{e.withdrawAccount || "-"}</div>
                           </div>
                           <div className="flex flex-col gap-2 shrink-0">
+                            <button onClick={() => setInspectUser(e)} className="btn btn-outline px-4 py-2 rounded-xl">查看詳情</button>
                             <button onClick={() => setEditUser(e)} className="btn btn-outline px-4 py-2 rounded-xl">編輯</button>
                             <button onClick={() => approveEngineer(e.id)} className="btn btn-primary px-4 py-2 rounded-xl">通過</button>
                             <button onClick={() => suspendUser(e.id)} className="btn btn-danger px-4 py-2 rounded-xl">拒絕/停權</button>
                           </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="card-modern p-6">
+                <h3 className="font-bold text-slate-800">案件稽核 ({jobAuditQueue.length})</h3>
+                <div className="text-xs text-slate-400 mt-1">補抓未指派、未打卡、缺照片、缺簽名、待驗收與異常案件</div>
+                <div className="space-y-3 mt-4">
+                  {jobAuditQueue.length === 0 ? (
+                    <div className="text-sm text-slate-400">目前沒有需要稽核的案件</div>
+                  ) : (
+                    jobAuditQueue.map(({ job, issues, risk }) => (
+                      <div key={job.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-800 truncate">{job.title}</div>
+                            <div className="text-xs text-slate-500 mt-1 truncate">{getUserName(job.clientId, job.clientName) || "-"} · {getJobNextAction(job)}</div>
+                            <div className="text-xs text-slate-400 mt-1">工單狀態：{JOB_STATUS_LABEL[job.status] || job.status || "-"}</div>
+                          </div>
+                          <span className={`text-xs px-2 py-1 rounded-full font-bold ${risk.tone === "danger" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{risk.label}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {issues.map((issue) => (
+                            <span key={issue} className="text-[10px] px-2 py-1 rounded-full bg-white border border-slate-200 text-slate-600">{issue}</span>
+                          ))}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => setInspectJob(job)} className="btn btn-outline px-3 py-2 rounded-xl">查看</button>
+                          <button onClick={() => setEditJob(job)} className="btn btn-primary px-3 py-2 rounded-xl">處理</button>
+                          <button onClick={() => updateJobAudit(job, "approved", "管理端稽核通過")} className="btn btn-outline px-3 py-2 rounded-xl">通過稽核</button>
+                          <button onClick={() => {
+                            const note = window.prompt("請輸入補件/稽核說明", job.auditNote || "");
+                            if (note === null) return;
+                            updateJobAudit(job, "needs_fix", note.trim());
+                          }} className="btn btn-danger px-3 py-2 rounded-xl">需補件</button>
                         </div>
                       </div>
                     ))
@@ -5027,6 +7447,14 @@ const AdminView = ({ user }) => {
                     <div className="font-bold">3. 風險控管</div>
                     <div className="text-xs text-slate-400 mt-1">可先給 verified，後續再依評分調整</div>
                   </div>
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4">
+                    <div className="font-bold">4. 金流核對</div>
+                    <div className="text-xs text-slate-400 mt-1">銀行資料、戶頭照片、提領帳戶與戶名是否一致</div>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4">
+                    <div className="font-bold">5. 案件稽核</div>
+                    <div className="text-xs text-slate-400 mt-1">未指派、未打卡、照片不足、簽名缺漏都要處理</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -5034,7 +7462,7 @@ const AdminView = ({ user }) => {
             <div className="card-modern p-6 mt-6">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-bold text-slate-800">提領審核 ({pendingWithdrawals.length})</h3>
-                <div className="text-xs text-slate-400">按通過即視為完成匯款</div>
+                <div className="text-xs text-slate-400">核准後請到「金流對帳」標記已匯款</div>
               </div>
               {pendingWithdrawals.length === 0 ? (
                 <div className="text-sm text-slate-400">目前沒有待審核提領</div>
@@ -5053,6 +7481,7 @@ const AdminView = ({ user }) => {
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="font-bold text-indigo-700 font-num mr-2">{formatCurrency(w.amount)}</div>
+                            <button onClick={() => setSelectedWithdrawal(w)} className="btn btn-outline px-4 py-2 rounded-xl">查看明細</button>
                             <button onClick={() => approveWithdrawal(w)} className="btn btn-primary px-4 py-2 rounded-xl">通過</button>
                             <button onClick={() => rejectWithdrawal(w)} className="btn btn-danger px-4 py-2 rounded-xl">拒絕</button>
                           </div>
@@ -5090,6 +7519,80 @@ const AdminView = ({ user }) => {
           </>
         )}
 
+        {view === "inventory" && <InventoryPanel />}
+
+        {view === "messages" && (
+          <>
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">訊息中心</h2>
+                <div className="text-sm text-slate-500 mt-1">追蹤客戶與工程師的案件對話，避免溝通黑盒化</div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setView("jobs")} className="btn btn-outline px-4 py-2 rounded-xl">前往工單</button>
+                <button onClick={() => setView("users")} className="btn btn-outline px-4 py-2 rounded-xl">前往會員管理</button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">對話案件數</div>
+                <div className="text-2xl font-bold text-slate-900 font-num">{messageThreads.length}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">今日最新訊息</div>
+                <div className="text-2xl font-bold text-indigo-700 font-num">{messageThreadsToday.length}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">總訊息數</div>
+                <div className="text-2xl font-bold text-emerald-600 font-num">{messageThreads.reduce((acc, t) => acc + t.count, 0)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">待追蹤案件</div>
+                <div className="text-2xl font-bold text-rose-600 font-num">{messageThreads.filter((t) => getJobRiskState(t.job).tone !== "ok").length}</div>
+              </div>
+            </div>
+
+            <div className="card-modern p-6 mt-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-bold text-slate-800">案件訊息列表</h3>
+                  <div className="text-xs text-slate-400 mt-1">點擊可查看工單或進一步處理案件</div>
+                </div>
+                <div className="text-xs text-slate-400">依最近訊息時間排序</div>
+              </div>
+              {messageThreads.length === 0 ? (
+                <div className="text-sm text-slate-400">目前沒有任何案件訊息</div>
+              ) : (
+                <div className="space-y-3">
+                  {messageThreads.slice(0, 12).map((t) => {
+                    const risk = getJobRiskState(t.job);
+                    return (
+                      <div key={t.job.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-bold">{getStatusProgress(t.job.status).label}</span>
+                            <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">{t.count} 則訊息</span>
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${risk.tone === "danger" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{risk.label}</span>
+                          </div>
+                          <div className="font-bold text-slate-800 mt-2 truncate">{t.job.title}</div>
+                          <div className="text-xs text-slate-500 mt-1 truncate">{t.peer} · {t.preview}</div>
+                          <div className="text-[10px] text-slate-400 mt-1">{t.lastTs ? new Date(t.lastTs).toLocaleString() : "-"}</div>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <button onClick={() => setInspectJob(t.job)} className="btn btn-outline px-3 py-2 rounded-xl">查看工單</button>
+                          <button onClick={() => setEditJob(t.job)} className="btn btn-primary px-3 py-2 rounded-xl">處理工單</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {view === "finance" && <FinancePanel />}
         {view === "reports" && <ReportsPanel />}
 
         {view === "settings" && (
@@ -5103,8 +7606,34 @@ const AdminView = ({ user }) => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="card-modern p-6">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2"><Icon name="shield-check" size={18} /> 資料健檢</h3>
+                <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <div className="text-xs text-slate-500">技師資料缺漏</div>
+                    <div className="text-2xl font-bold text-amber-600 font-num">{dataHealth.missingEngineerProfile}</div>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <div className="text-xs text-slate-500">客戶資料缺漏</div>
+                    <div className="text-2xl font-bold text-amber-600 font-num">{dataHealth.missingClientProfile}</div>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <div className="text-xs text-slate-500">未指派/缺工程師</div>
+                    <div className="text-2xl font-bold text-rose-600 font-num">{dataHealth.jobsWithoutAssignee}</div>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <div className="text-xs text-slate-500">缺照片案件</div>
+                    <div className="text-2xl font-bold text-rose-600 font-num">{dataHealth.jobsWithoutPhotos}</div>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <button onClick={() => setAuditOpen(true)} className="btn btn-primary">查看稽核</button>
+                  <button onClick={() => setView("approvals")} className="btn btn-outline">前往審核中心</button>
+                </div>
+              </div>
+
+              <div className="card-modern p-6">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2"><Icon name="database" size={18} /> 資料備份</h3>
-                <div className="text-sm text-slate-600 mt-2">匯出完整 users/jobs/audit 成為 snapshot JSON，可在另一台電腦匯入延續開發。</div>
+                <div className="text-sm text-slate-600 mt-2">匯出完整 users/jobs/audit/withdrawals/inventory 成為 snapshot JSON，可在另一台電腦匯入延續開發。</div>
                 <div className="flex gap-2 mt-4">
                   <button onClick={() => exportSnapshot()} className="btn btn-primary">匯出備份</button>
                   <button onClick={() => setImportOpen(true)} className="btn btn-outline">匯入還原</button>
@@ -5130,9 +7659,35 @@ const AdminView = ({ user }) => {
 };
 
 
+const UnsupportedRoleScreen = ({ user, onLogout }) => (
+  <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+    <div className="w-full max-w-xl card-modern p-8">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center">
+          <Icon name="shield-alert" size={24} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">帳號角色異常</h2>
+          <p className="text-sm text-slate-500 mt-1">系統已阻止進入主頁，以避免因舊資料或錯誤角色造成白屏。</p>
+        </div>
+      </div>
+
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-700 space-y-2">
+        <div><span className="font-bold">目前登入：</span>{user?.name || "-"}</div>
+        <div><span className="font-bold">角色值：</span>{String(user?.role || "-")}</div>
+        <div><span className="font-bold">建議處理：</span>請登出後以正確帳號重新登入，或到後台修正會員角色。</div>
+      </div>
+
+      <div className="flex flex-wrap gap-3 mt-6">
+        <button onClick={onLogout} className="btn btn-primary px-5 py-3 rounded-xl">登出重登</button>
+      </div>
+    </div>
+  </div>
+);
+
 // --- App ---
 const App = () => {
-  const { user } = useApp();
+  const { user, logout } = useApp();
   const [showHelp, setShowHelp] = useState(false);
   const [showDiag, setShowDiag] = useState(false);
 
@@ -5142,10 +7697,17 @@ const App = () => {
         <AuthScreen />
       ) : user.role === "admin" ? (
         <AdminView user={user} />
-      ) : user.role.startsWith("client") ? (
+      ) : roleGroup(user.role) === "client" ? (
         <ClientView user={user} />
-      ) : (
+      ) : user.role === "engineer" || user.role === "tech" ? (
         <TechView user={user} />
+      ) : (
+        <UnsupportedRoleScreen
+          user={user}
+          onLogout={() => {
+            logout();
+          }}
+        />
       )}
 
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} onDiagnostics={() => { setShowHelp(false); setShowDiag(true); }} />}
@@ -5154,11 +7716,11 @@ const App = () => {
 
       <button
         onClick={() => setShowHelp(true)}
-        className="fixed bottom-24 right-6 z-[40] w-14 h-14 rounded-2xl bg-white border border-slate-200 shadow-xl flex items-center justify-center text-indigo-600 hover:bg-slate-50 active:scale-95 transition"
+        className="fixed bottom-6 right-6 md:left-6 md:right-auto z-[40] w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-xl flex items-center justify-center text-indigo-600 hover:bg-slate-50 active:scale-95 transition"
         aria-label="操作說明"
         title="操作說明"
       >
-        <Icon name="help-circle" size={22} />
+        <Icon name="help-circle" size={20} />
       </button>
     </>
   );
@@ -5174,6 +7736,29 @@ root.render(
     </AppProvider>
   </ErrorBoundary>
 );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
