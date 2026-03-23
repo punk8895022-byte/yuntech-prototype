@@ -228,6 +228,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -758,6 +759,7 @@ const AppProvider = ({ children }) => {
       accountNo: accountInfo?.accountNo || "",
       accountName: accountInfo?.accountName || "",
       withdrawAccount: accountInfo?.withdrawAccount || "",
+      bankBookPhoto: accountInfo?.bankBookPhoto || "",
       note: "",
       reviewedAt: null,
       reviewerId: null,
@@ -3112,6 +3114,23 @@ const WalletModal = ({ user, pendingTail, onWithdraw, onClose }) => {
           </div>
 
           <div className="card-modern p-5">
+            <div className="text-xs font-bold text-slate-400 uppercase mb-2">匯款核對資訊</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">
+              <div><span className="text-xs text-slate-400 block">銀行名稱</span>{user.bankName || "-"}</div>
+              <div><span className="text-xs text-slate-400 block">銀行代碼</span>{user.bankCode || "-"}</div>
+              <div><span className="text-xs text-slate-400 block">帳號</span>{user.accountNo || "-"}</div>
+              <div><span className="text-xs text-slate-400 block">戶名</span>{user.accountName || "-"}</div>
+            </div>
+            <div className="mt-3">
+              {user.bankBookPhoto ? (
+                <img src={user.bankBookPhoto} alt="戶頭照片" className="w-full max-w-md rounded-2xl border border-slate-200" />
+              ) : (
+                <div className="text-xs text-slate-400">尚未上傳戶頭照片。</div>
+              )}
+            </div>
+          </div>
+
+          <div className="card-modern p-5">
             <div className="text-xs font-bold text-slate-400 uppercase mb-2">待收尾款 (待驗收)</div>
             <div className="text-2xl font-bold text-indigo-600 font-num">{formatCurrency(pendingTail)}</div>
             <div className="text-xs text-slate-400 mt-2">客戶完成「驗收付款」後會入帳到錢包。</div>
@@ -3176,6 +3195,7 @@ const ProfileModal = ({ user, onClose }) => {
     bankCode: user?.bankCode || "",
     accountNo: user?.accountNo || "",
     accountName: user?.accountName || "",
+    bankBookPhoto: user?.bankBookPhoto || "",
     licenseNo: user?.licenseNo || "",
   });
 
@@ -3203,6 +3223,7 @@ const ProfileModal = ({ user, onClose }) => {
     const bankCode = String(form.bankCode || "").trim();
     const accountNo = String(form.accountNo || "").trim();
     const accountName = String(form.accountName || "").trim();
+    const bankBookPhoto = String(form.bankBookPhoto || "").trim();
     const licenseNo = String(form.licenseNo || "").trim();
 
     if (!name) {
@@ -3236,6 +3257,7 @@ const ProfileModal = ({ user, onClose }) => {
       bankCode,
       accountNo,
       accountName,
+      bankBookPhoto,
       licenseNo,
       avatar: name ? name[0] : (user.avatar || "U"),
     });
@@ -3335,6 +3357,32 @@ const ProfileModal = ({ user, onClose }) => {
                 <label className="text-xs font-bold text-slate-500 mb-2 block">戶名</label>
                 <input className="input-modern" value={form.accountName} onChange={(e) => setForm((p) => ({ ...p, accountName: e.target.value }))} placeholder="戶名" />
               </div>
+              <div className="md:col-span-2">
+                <label className="text-xs font-bold text-slate-500 mb-2 block">戶頭照片</label>
+                <div className="space-y-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="input-modern"
+                    onChange={async (e) => {
+                      const file = e.target.files && e.target.files[0];
+                      if (!file) return;
+                      try {
+                        const imageDataUrl = await compressImageFile(file);
+                        setForm((p) => ({ ...p, bankBookPhoto: imageDataUrl }));
+                        addToast("已上傳戶頭照片", "success");
+                      } catch {
+                        addToast("戶頭照片上傳失敗，請改用較小圖片", "error");
+                      }
+                    }}
+                  />
+                  {form.bankBookPhoto ? (
+                    <img src={form.bankBookPhoto} alt="戶頭照片" className="w-full max-w-md rounded-2xl border border-slate-200" />
+                  ) : (
+                    <div className="text-xs text-slate-400">上傳存摺封面或戶頭照片，方便會計核對。</div>
+                  )}
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -3420,6 +3468,7 @@ const TechView = ({ user }) => {
         accountNo: user.accountNo,
         accountName: user.accountName,
         withdrawAccount: user.withdrawAccount,
+        bankBookPhoto: user.bankBookPhoto,
       },
     });
     updateUser({ ...user, wallet: 0 });
@@ -4396,6 +4445,13 @@ const AdminView = ({ user }) => {
       title: "",
       experience: "",
       skills: "",
+      licenseNo: "",
+      withdrawAccount: "",
+      bankName: "",
+      bankCode: "",
+      accountNo: "",
+      accountName: "",
+      bankBookPhoto: "",
     });
 
     const save = () => {
@@ -4425,6 +4481,13 @@ const AdminView = ({ user }) => {
         u.skills = form.skills.split(",").map((s) => s.trim()).filter(Boolean);
         u.rating = 5.0;
         u.jobs = 0;
+        u.licenseNo = form.licenseNo;
+        u.withdrawAccount = form.withdrawAccount;
+        u.bankName = form.bankName;
+        u.bankCode = form.bankCode;
+        u.accountNo = form.accountNo;
+        u.accountName = form.accountName;
+        u.bankBookPhoto = form.bankBookPhoto;
       }
 
       setUsers((prev) => [...prev, u]);
@@ -4519,6 +4582,50 @@ const AdminView = ({ user }) => {
                 <div className="md:col-span-2">
                   <label className="text-xs font-bold text-slate-500 block mb-1">技能 (逗號分隔)</label>
                   <input className="input-modern" value={form.skills} onChange={(e) => setForm({ ...form, skills: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">證照/執照編號</label>
+                  <input className="input-modern" value={form.licenseNo} onChange={(e) => setForm({ ...form, licenseNo: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">提領帳戶</label>
+                  <input className="input-modern" value={form.withdrawAccount} onChange={(e) => setForm({ ...form, withdrawAccount: e.target.value })} placeholder="銀行帳號/戶名" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">銀行名稱</label>
+                  <input className="input-modern" value={form.bankName} onChange={(e) => setForm({ ...form, bankName: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">銀行代碼</label>
+                  <input className="input-modern" value={form.bankCode} onChange={(e) => setForm({ ...form, bankCode: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">帳號</label>
+                  <input className="input-modern" value={form.accountNo} onChange={(e) => setForm({ ...form, accountNo: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">戶名</label>
+                  <input className="input-modern" value={form.accountName} onChange={(e) => setForm({ ...form, accountName: e.target.value })} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-500 block mb-1">戶頭照片</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="input-modern"
+                    onChange={async (e) => {
+                      const file = e.target.files && e.target.files[0];
+                      if (!file) return;
+                      try {
+                        const imageDataUrl = await compressImageFile(file);
+                        setForm((p) => ({ ...p, bankBookPhoto: imageDataUrl }));
+                        addToast("已上傳戶頭照片", "success");
+                      } catch {
+                        addToast("戶頭照片上傳失敗，請改用較小圖片", "error");
+                      }
+                    }}
+                  />
+                  {form.bankBookPhoto ? <img src={form.bankBookPhoto} alt="戶頭照片" className="mt-2 w-full max-w-md rounded-2xl border border-slate-200" /> : <div className="mt-2 text-xs text-slate-400">上傳戶頭照片，方便會計核對</div>}
                 </div>
               </>
             )}
@@ -4766,6 +4873,50 @@ const AdminView = ({ user }) => {
                     onChange={(e) => setForm({ ...form, skills: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
                   />
                 </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">證照/執照編號</label>
+                  <input className="input-modern" value={form.licenseNo || ""} onChange={(e) => setForm({ ...form, licenseNo: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">提領帳戶</label>
+                  <input className="input-modern" value={form.withdrawAccount || ""} onChange={(e) => setForm({ ...form, withdrawAccount: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">銀行名稱</label>
+                  <input className="input-modern" value={form.bankName || ""} onChange={(e) => setForm({ ...form, bankName: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">銀行代碼</label>
+                  <input className="input-modern" value={form.bankCode || ""} onChange={(e) => setForm({ ...form, bankCode: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">帳號</label>
+                  <input className="input-modern" value={form.accountNo || ""} onChange={(e) => setForm({ ...form, accountNo: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">戶名</label>
+                  <input className="input-modern" value={form.accountName || ""} onChange={(e) => setForm({ ...form, accountName: e.target.value })} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-500 block mb-1">戶頭照片</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="input-modern"
+                    onChange={async (e) => {
+                      const file = e.target.files && e.target.files[0];
+                      if (!file) return;
+                      try {
+                        const imageDataUrl = await compressImageFile(file);
+                        setForm({ ...form, bankBookPhoto: imageDataUrl });
+                        addToast("已更新戶頭照片", "success");
+                      } catch {
+                        addToast("戶頭照片上傳失敗，請改用較小圖片", "error");
+                      }
+                    }}
+                  />
+                  {form.bankBookPhoto ? <img src={form.bankBookPhoto} alt="戶頭照片" className="mt-2 w-full max-w-md rounded-2xl border border-slate-200" /> : <div className="mt-2 text-xs text-slate-400">尚未上傳戶頭照片</div>}
+                </div>
               </>
             )}
 
@@ -4802,6 +4953,13 @@ const AdminView = ({ user }) => {
     }, 0);
     const memberWithdrawals = withdrawals.filter((w) => w.userId === u.id);
     const memberWithdrawnTotal = memberWithdrawals.filter((w) => w.status === "paid" || w.status === "approved").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+    const bankInfo = [
+      { label: "銀行名稱", value: u.bankName || "-" },
+      { label: "銀行代碼", value: u.bankCode || "-" },
+      { label: "帳號", value: u.accountNo || "-" },
+      { label: "戶名", value: u.accountName || "-" },
+      { label: "提領帳戶", value: u.withdrawAccount || "-" },
+    ];
     return (
       <div className="fixed inset-0 z-[220] bg-black/50 flex items-start justify-center p-4 py-6 overflow-y-auto">
         <div className="bg-white w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -4852,6 +5010,23 @@ const AdminView = ({ user }) => {
                 <div>角色：{roleLabel(u.role)}</div>
               </div>
             </div>
+            {u.role === "engineer" && (
+              <div className="mt-4 bg-white border border-slate-200 rounded-2xl p-4">
+                <div className="text-xs text-slate-400 mb-3">匯款核對資料</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600">
+                  {bankInfo.map((item) => (
+                    <div key={item.label}><span className="text-xs text-slate-400 block">{item.label}</span>{item.value}</div>
+                  ))}
+                </div>
+                <div className="mt-3">
+                  {u.bankBookPhoto ? (
+                    <img src={u.bankBookPhoto} alt="戶頭照片" className="w-full max-w-md rounded-2xl border border-slate-200" />
+                  ) : (
+                    <div className="text-xs text-slate-400">尚未上傳戶頭照片</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           <div className="p-6 border-t flex gap-3">
             <button onClick={() => { setEditUser(u); onClose(); }} className="flex-1 btn btn-outline">編輯會員</button>
@@ -5154,6 +5329,27 @@ const AdminView = ({ user }) => {
   const approvedWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "approved"), [withdrawals]);
   const paidWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "paid"), [withdrawals]);
   const rejectedWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "rejected"), [withdrawals]);
+  const jobAuditQueue = useMemo(() => {
+    return jobs
+      .map((j) => {
+        const issues = [];
+        const risk = getJobRiskState(j);
+        const jobPhotos = Array.isArray(j.photos) ? j.photos : [];
+        if (j.status === "open" && !j.assignee) issues.push("未指派");
+        if (j.status === "active" && !j.techArrived) issues.push("未打卡");
+        if (j.status === "active" && j.techArrived && jobPhotos.length === 0) issues.push("完工照片不足");
+        if (j.status === "active" && j.techArrived && !j.signature) issues.push("缺少簽名");
+        if (j.status === "completed") issues.push("待客戶驗收");
+        if (j.status === "closed" && j.acceptanceFlag) issues.push("驗收異常");
+        if (j.status === "closed" && !j.acceptanceAt) issues.push("缺驗收紀錄");
+        if (j.auditStatus === "needs_fix") issues.push("稽核需補件");
+        if (risk.tone === "danger") issues.push("已逾 SLA");
+        return { job: j, issues, risk };
+      })
+      .filter((row) => row.issues.length > 0)
+      .sort((a, b) => b.issues.length - a.issues.length || getJobAgeDays(b.job) - getJobAgeDays(a.job))
+      .slice(0, 8);
+  }, [jobs]);
 
   const paymentJobs = useMemo(() => jobs.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()), [jobs]);
   const depositCollectedTotal = useMemo(() => {
@@ -5324,6 +5520,7 @@ const AdminView = ({ user }) => {
           帳號: w.accountNo || target?.accountNo || "-",
           戶名: w.accountName || target?.accountName || "-",
           提領帳戶: w.withdrawAccount || target?.withdrawAccount || "-",
+          戶頭照片: w.bankBookPhoto || target?.bankBookPhoto || "",
           申請時間: w.createdAt ? new Date(w.createdAt).toLocaleString() : "-",
           預計匯款: w.scheduledAt ? new Date(w.scheduledAt).toLocaleString() : "-",
           審核時間: w.reviewedAt ? new Date(w.reviewedAt).toLocaleString() : "-",
@@ -5487,6 +5684,11 @@ const AdminView = ({ user }) => {
                           <div>{row.銀行代碼}</div>
                           <div>{row.帳號}</div>
                           <div>{row.戶名}</div>
+                          {row.戶頭照片 ? (
+                            <img src={row.戶頭照片} alt="戶頭照片" className="mt-2 w-24 h-24 object-cover rounded-xl border border-slate-200" />
+                          ) : (
+                            <div className="mt-2 text-[10px] text-slate-400">無戶頭照片</div>
+                          )}
                         </td>
                         <td className="p-4 text-xs text-slate-500">
                           <div>申請：{row.申請時間}</div>
@@ -5545,7 +5747,7 @@ const AdminView = ({ user }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row md:h-screen md:overflow-hidden">
       {showReport && <DailyReport onClose={() => setShowReport(false)} />}
       {editUser && <EditUserModal data={editUser} onClose={() => setEditUser(null)} />}
       {inspectUser && <UserInspectModal data={inspectUser} onClose={() => setInspectUser(null)} />}
@@ -5556,7 +5758,7 @@ const AdminView = ({ user }) => {
       {importOpen && <ImportModal onClose={() => setImportOpen(false)} />}
       {auditOpen && <AuditModal onClose={() => setAuditOpen(false)} />}
 
-      <aside className="w-full md:w-80 bg-white border-r p-6 flex flex-col">
+      <aside className="w-full md:w-80 bg-white border-r p-6 flex flex-col md:h-screen md:overflow-y-auto">
         <div className="flex items-center gap-3 font-bold text-xl text-indigo-700 mb-6"><Icon name="cloud-lightning" /> 雲程中控</div>
 
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5">
@@ -5600,7 +5802,7 @@ const AdminView = ({ user }) => {
         </button>
       </aside>
 
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+      <main className="flex-1 min-h-0 p-6 md:p-8 overflow-y-auto md:h-screen">
         {view === "overview" && (
           <>
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
@@ -6144,7 +6346,7 @@ const AdminView = ({ user }) => {
               <button onClick={() => setView("users")} className="btn btn-outline px-4 py-2 rounded-xl">前往會員管理</button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
               <div className="card-modern p-6">
                 <h3 className="font-bold text-slate-800">待審核 ({pendingEngineers.length})</h3>
                 <div className="text-xs text-slate-400 mt-1">建議：確認姓名/電話/技能/年資，再按通過</div>
@@ -6175,6 +6377,38 @@ const AdminView = ({ user }) => {
               </div>
 
               <div className="card-modern p-6">
+                <h3 className="font-bold text-slate-800">案件稽核 ({jobAuditQueue.length})</h3>
+                <div className="text-xs text-slate-400 mt-1">補抓未指派、未打卡、缺照片、缺簽名、待驗收與異常案件</div>
+                <div className="space-y-3 mt-4">
+                  {jobAuditQueue.length === 0 ? (
+                    <div className="text-sm text-slate-400">目前沒有需要稽核的案件</div>
+                  ) : (
+                    jobAuditQueue.map(({ job, issues, risk }) => (
+                      <div key={job.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-800 truncate">{job.title}</div>
+                            <div className="text-xs text-slate-500 mt-1 truncate">{getUserName(job.clientId, job.clientName) || "-"} · {getJobNextAction(job)}</div>
+                            <div className="text-xs text-slate-400 mt-1">工單狀態：{JOB_STATUS_LABEL[job.status] || job.status || "-"}</div>
+                          </div>
+                          <span className={`text-xs px-2 py-1 rounded-full font-bold ${risk.tone === "danger" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{risk.label}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {issues.map((issue) => (
+                            <span key={issue} className="text-[10px] px-2 py-1 rounded-full bg-white border border-slate-200 text-slate-600">{issue}</span>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => setInspectJob(job)} className="btn btn-outline px-3 py-2 rounded-xl">查看</button>
+                          <button onClick={() => setEditJob(job)} className="btn btn-primary px-3 py-2 rounded-xl">處理</button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="card-modern p-6">
                 <h3 className="font-bold text-slate-800">審核建議檢核表</h3>
                 <div className="text-sm text-slate-600 mt-3 space-y-2">
                   <div className="bg-white border border-slate-200 rounded-2xl p-4">
@@ -6188,6 +6422,14 @@ const AdminView = ({ user }) => {
                   <div className="bg-white border border-slate-200 rounded-2xl p-4">
                     <div className="font-bold">3. 風險控管</div>
                     <div className="text-xs text-slate-400 mt-1">可先給 verified，後續再依評分調整</div>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4">
+                    <div className="font-bold">4. 金流核對</div>
+                    <div className="text-xs text-slate-400 mt-1">銀行資料、戶頭照片、提領帳戶與戶名是否一致</div>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4">
+                    <div className="font-bold">5. 案件稽核</div>
+                    <div className="text-xs text-slate-400 mt-1">未指派、未打卡、照片不足、簽名缺漏都要處理</div>
                   </div>
                 </div>
               </div>
@@ -6378,9 +6620,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
