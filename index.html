@@ -253,6 +253,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -415,6 +416,13 @@ const DB_DEFAULTS = {
     },
   ],
   withdrawals: [],
+  inventory: [
+    { id: "S-001", name: "Cat.6 網路線", category: "網路耗材", unit: "箱", quantity: 18, minQuantity: 8, location: "A1-01", supplier: "常用庫", cost: 4200, note: "主線材", updatedAt: new Date().toISOString() },
+    { id: "S-002", name: "RJ45 水晶頭", category: "網路耗材", unit: "盒", quantity: 60, minQuantity: 20, location: "A1-02", supplier: "常用庫", cost: 180, note: "備品", updatedAt: new Date().toISOString() },
+    { id: "S-003", name: "500萬 IPCam", category: "監控設備", unit: "台", quantity: 12, minQuantity: 4, location: "B2-03", supplier: "監控供應商", cost: 3500, note: "", updatedAt: new Date().toISOString() },
+    { id: "S-004", name: "8路 NVR 主機", category: "監控設備", unit: "台", quantity: 4, minQuantity: 2, location: "B2-04", supplier: "監控供應商", cost: 8500, note: "", updatedAt: new Date().toISOString() },
+    { id: "S-005", name: "陽極鎖", category: "門禁設備", unit: "組", quantity: 8, minQuantity: 3, location: "C3-01", supplier: "門禁供應商", cost: 2200, note: "", updatedAt: new Date().toISOString() },
+  ],
   jobs: [
     {
       id: "J-2026021501",
@@ -498,6 +506,23 @@ const normalizeJob = (job) => {
     auditAt: job.auditAt ?? null,
     auditBy: job.auditBy ?? null,
     
+  };
+};
+
+const normalizeInventoryItem = (item) => {
+  return {
+    id: item?.id ?? `S-${Date.now()}`,
+    name: String(item?.name || "").trim(),
+    category: String(item?.category || "一般").trim(),
+    unit: String(item?.unit || "個").trim(),
+    quantity: Number(item?.quantity ?? 0) || 0,
+    minQuantity: Number(item?.minQuantity ?? item?.min_quantity ?? 0) || 0,
+    location: String(item?.location || "").trim(),
+    supplier: String(item?.supplier || "").trim(),
+    cost: Number(item?.cost ?? item?.price ?? 0) || 0,
+    note: String(item?.note || "").trim(),
+    updatedAt: item?.updatedAt || new Date().toISOString(),
+    status: String(item?.status || "").trim(),
   };
 };
 
@@ -811,6 +836,15 @@ const AppProvider = ({ children }) => {
     }
   });
 
+  const [inventory, setInventory] = useState(() => {
+    try {
+      const loaded = safeStorageGet("cl_inventory_v101", DB_DEFAULTS.inventory || []) || [];
+      return Array.isArray(loaded) ? loaded.map(normalizeInventoryItem) : (DB_DEFAULTS.inventory || []).map(normalizeInventoryItem);
+    } catch {
+      return (DB_DEFAULTS.inventory || []).map(normalizeInventoryItem);
+    }
+  });
+
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -825,6 +859,9 @@ const AppProvider = ({ children }) => {
   useEffect(() => {
     safeStorageSet("cl_withdrawals_v101", JSON.stringify(withdrawals));
   }, [withdrawals]);
+  useEffect(() => {
+    safeStorageSet("cl_inventory_v101", JSON.stringify(inventory.map(normalizeInventoryItem)));
+  }, [inventory]);
   globalThis.__cloudlink_users_ref = users;
   useEffect(() => {
     if (!user) return;
@@ -909,6 +946,8 @@ const AppProvider = ({ children }) => {
         jobs,
         users,
         withdrawals,
+        inventory,
+        setInventory,
         login,
         logout,
         addJob,
@@ -4107,7 +4146,7 @@ const TechView = ({ user }) => {
 
 
 const AdminView = ({ user }) => {
-  const { jobs, setJobs, users, setUsers, withdrawals, setWithdrawals, updateUser, updateWithdrawal, logout, resetData } = useApp();
+  const { jobs, setJobs, users, setUsers, withdrawals, setWithdrawals, inventory, setInventory, updateUser, updateWithdrawal, logout, resetData } = useApp();
   const { addToast } = useToast();
 
   // Views: overview | jobs | users | approvals | finance | reports | settings
@@ -4290,8 +4329,9 @@ const AdminView = ({ user }) => {
       jobs,
       audit,
       withdrawals,
+      inventory,
     };
-    logAudit("export_snapshot", `users=${users.length} jobs=${jobs.length}`);
+    logAudit("export_snapshot", `users=${users.length} jobs=${jobs.length} inventory=${inventory.length}`);
     downloadText(`cloudlink_snapshot_${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(payload, null, 2), "application/json;charset=utf-8");
     addToast("已匯出完整備份(JSON)", "success");
   };
@@ -4727,6 +4767,7 @@ const AdminView = ({ user }) => {
         const nextJobs = Array.isArray(payload.jobs) ? payload.jobs : null;
         const nextAudit = Array.isArray(payload.audit) ? payload.audit : null;
         const nextWithdrawals = Array.isArray(payload.withdrawals) ? payload.withdrawals : null;
+        const nextInventory = Array.isArray(payload.inventory) ? payload.inventory : null;
 
         if (!nextUsers || !nextJobs) {
           addToast("檔案格式不正確：需要包含 users/jobs", "error");
@@ -4739,11 +4780,12 @@ const AdminView = ({ user }) => {
           return;
         }
 
-      if (mode === "replace") {
+        if (mode === "replace") {
           setUsers(nextUsers.map(normalizeUser));
           setJobs(nextJobs.map(normalizeJob));
           if (nextAudit) setAudit(nextAudit);
           if (nextWithdrawals) setWithdrawals(nextWithdrawals);
+          if (nextInventory) setInventory(nextInventory.map(normalizeInventoryItem));
         } else {
           setUsers((prev) => {
             const map = new Map(prev.map((u) => [u.id, u]));
@@ -4761,6 +4803,13 @@ const AdminView = ({ user }) => {
               const map = new Map(prev.map((w) => [w.id, w]));
               nextWithdrawals.forEach((w) => map.set(w.id, { ...map.get(w.id), ...w }));
               return Array.from(map.values());
+            });
+          }
+          if (nextInventory) {
+            setInventory((prev) => {
+              const map = new Map(prev.map((item) => [item.id, item]));
+              nextInventory.forEach((item) => map.set(item.id, normalizeInventoryItem({ ...map.get(item.id), ...item })));
+              return Array.from(map.values()).map(normalizeInventoryItem);
             });
           }
         }
@@ -5819,6 +5868,9 @@ const AdminView = ({ user }) => {
       .sort((a, b) => b.closed - a.closed || b.jobs - a.jobs)
       .slice(0, 5);
   }, [engineers, jobs, withdrawals]);
+  const inventoryItems = useMemo(() => inventory.map(normalizeInventoryItem), [inventory]);
+  const lowStockInventory = useMemo(() => inventoryItems.filter((item) => Number(item.quantity) <= Number(item.minQuantity)), [inventoryItems]);
+  const inventoryValue = useMemo(() => inventoryItems.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.cost) || 0), 0), [inventoryItems]);
 
   const ReportsPanel = () => {
     return (
@@ -5875,6 +5927,251 @@ const AdminView = ({ user }) => {
           <h3 className="font-bold text-slate-800">近 7 日現金流趨勢</h3>
           <SimpleBarChart data={sevenDayRevenue} />
           <div className="text-xs text-slate-400 mt-2">計算方式：訂金(建立日) + 尾款(驗收付款日)</div>
+        </div>
+      </div>
+    );
+  };
+
+  const InventoryPanel = () => {
+    const [query, setQuery] = useState("");
+    const [lowOnly, setLowOnly] = useState(false);
+    const [editingId, setEditingId] = useState(null);
+    const [form, setForm] = useState({
+      name: "",
+      category: "一般",
+      unit: "個",
+      quantity: 0,
+      minQuantity: 0,
+      location: "",
+      supplier: "",
+      cost: 0,
+      note: "",
+    });
+
+    const items = useMemo(
+      () =>
+        inventory
+          .map(normalizeInventoryItem)
+          .sort((a, b) => String(a.category || "").localeCompare(String(b.category || ""), "zh-Hant") || String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant")),
+      [inventory]
+    );
+
+    const stats = useMemo(() => {
+      const low = items.filter((i) => Number(i.quantity) <= Number(i.minQuantity));
+      const value = items.reduce((acc, i) => acc + (Number(i.quantity) || 0) * (Number(i.cost) || 0), 0);
+      const qty = items.reduce((acc, i) => acc + (Number(i.quantity) || 0), 0);
+      return { lowCount: low.length, value, qty, total: items.length };
+    }, [items]);
+
+    const filtered = items.filter((i) => {
+      const hay = [i.name, i.category, i.location, i.supplier, i.unit, i.note].filter(Boolean).join(" ").toLowerCase();
+      const matchesQuery = !query.trim() || hay.includes(query.trim().toLowerCase());
+      const matchesLow = !lowOnly || Number(i.quantity) <= Number(i.minQuantity);
+      return matchesQuery && matchesLow;
+    });
+
+    const clearForm = () => {
+      setEditingId(null);
+      setForm({ name: "", category: "一般", unit: "個", quantity: 0, minQuantity: 0, location: "", supplier: "", cost: 0, note: "" });
+    };
+
+    const startEdit = (item) => {
+      setEditingId(item.id);
+      setForm({
+        name: item.name || "",
+        category: item.category || "一般",
+        unit: item.unit || "個",
+        quantity: Number(item.quantity) || 0,
+        minQuantity: Number(item.minQuantity) || 0,
+        location: item.location || "",
+        supplier: item.supplier || "",
+        cost: Number(item.cost) || 0,
+        note: item.note || "",
+      });
+    };
+
+    const saveItem = () => {
+      if (!String(form.name || "").trim()) {
+        addToast("請輸入倉庫品項名稱", "error");
+        return;
+      }
+      const next = normalizeInventoryItem({
+        id: editingId || `S-${Date.now()}`,
+        ...form,
+        quantity: Number(form.quantity) || 0,
+        minQuantity: Number(form.minQuantity) || 0,
+        cost: Number(form.cost) || 0,
+        updatedAt: new Date().toISOString(),
+      });
+      setInventory((prev) => {
+        const map = new Map(prev.map((item) => [item.id, item]));
+        map.set(next.id, next);
+        return Array.from(map.values()).map(normalizeInventoryItem);
+      });
+      logAudit(editingId ? "update_inventory_item" : "create_inventory_item", `${next.id} ${next.name}`);
+      addToast(editingId ? "已更新倉庫品項" : "已新增倉庫品項", "success");
+      clearForm();
+    };
+
+    const adjustQty = (item, delta) => {
+      setInventory((prev) =>
+        prev.map((row) =>
+          row.id === item.id
+            ? normalizeInventoryItem({ ...row, quantity: Math.max(0, (Number(row.quantity) || 0) + delta), updatedAt: new Date().toISOString() })
+            : row
+        )
+      );
+      logAudit("adjust_inventory_qty", `${item.id} delta=${delta}`);
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="card-modern p-5">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">倉庫管理</h2>
+              <div className="text-sm text-slate-500 mt-1">管理庫存、低庫存警示、品項新增與補貨調整</div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { clearForm(); }} className="btn btn-outline px-4 py-2 rounded-xl">新增品項</button>
+              <button onClick={() => downloadText(`inventory_${new Date().toISOString().slice(0, 10)}.csv`, toCSV(items.map((i) => ({ 品項: i.name, 類別: i.category, 單位: i.unit, 數量: i.quantity, 最低庫存: i.minQuantity, 地點: i.location, 供應商: i.supplier, 單價: i.cost, 更新時間: i.updatedAt }))), "text/csv;charset=utf-8")} className="btn btn-outline px-4 py-2 rounded-xl">匯出 CSV</button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">品項數</div>
+              <div className="text-2xl font-bold text-slate-900 font-num">{stats.total}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">低庫存</div>
+              <div className="text-2xl font-bold text-rose-600 font-num">{stats.lowCount}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">總數量</div>
+              <div className="text-2xl font-bold text-indigo-700 font-num">{stats.qty}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">估算庫存價值</div>
+              <div className="text-2xl font-bold text-emerald-600 font-num">{formatCurrency(stats.value)}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+            <div className="md:col-span-2">
+              <label className="text-xs font-bold text-slate-500 block mb-1">搜尋</label>
+              <input className="input-modern" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="品項 / 類別 / 位置 / 供應商" />
+            </div>
+            <div className="flex items-end">
+              <button onClick={() => setLowOnly((v) => !v)} className={`w-full px-4 py-3 rounded-xl font-bold border ${lowOnly ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-white text-slate-600 border-slate-200"}`}>
+                {lowOnly ? "顯示全部" : "只看低庫存"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="card-modern p-6">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 className="font-bold text-slate-800">{editingId ? "編輯倉庫品項" : "新增倉庫品項"}</h3>
+              <div className="text-xs text-slate-400 mt-1">{editingId ? `編輯中：${editingId}` : "新增後可立即在倉庫表單調整數量"}</div>
+            </div>
+            {editingId && <button onClick={clearForm} className="btn btn-outline px-4 py-2 rounded-xl">取消編輯</button>}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="md:col-span-2">
+              <label className="text-xs font-bold text-slate-500 block mb-1">品項名稱</label>
+              <input className="input-modern" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="例如：Cat.6 網路線" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">類別</label>
+              <input className="input-modern" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="網路耗材 / 監控設備" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">單位</label>
+              <input className="input-modern" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="箱 / 台 / 組" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">數量</label>
+              <input className="input-modern" type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) || 0 })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">最低庫存</label>
+              <input className="input-modern" type="number" value={form.minQuantity} onChange={(e) => setForm({ ...form, minQuantity: Number(e.target.value) || 0 })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">單價</label>
+              <input className="input-modern" type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: Number(e.target.value) || 0 })} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">位置</label>
+              <input className="input-modern" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="A1-01" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">供應商</label>
+              <input className="input-modern" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="供應商名稱" />
+            </div>
+            <div className="md:col-span-3">
+              <label className="text-xs font-bold text-slate-500 block mb-1">備註</label>
+              <textarea className="input-modern h-20 resize-none" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="可填寫備品說明、採購資訊、特殊保存條件" />
+            </div>
+          </div>
+          <div className="mt-4 flex gap-3">
+            <button onClick={saveItem} className="btn btn-primary px-4 py-3 rounded-xl">{editingId ? "更新品項" : "新增品項"}</button>
+            <button onClick={clearForm} className="btn btn-outline px-4 py-3 rounded-xl">清空</button>
+          </div>
+        </div>
+
+        <div className="card-modern overflow-hidden">
+          <div className="overflow-x-auto no-scrollbar">
+            <table className="min-w-[1200px] w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500 border-b sticky top-0">
+                <tr>
+                  <th className="p-4">品項</th>
+                  <th className="p-4">類別 / 位置</th>
+                  <th className="p-4">庫存</th>
+                  <th className="p-4">最低</th>
+                  <th className="p-4">供應商</th>
+                  <th className="p-4">單價</th>
+                  <th className="p-4">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((item) => {
+                  const low = Number(item.quantity) <= Number(item.minQuantity);
+                  return (
+                    <tr key={item.id} className="border-b hover:bg-slate-50 align-top">
+                      <td className="p-4">
+                        <div className="font-bold text-slate-800">{item.name}</div>
+                        <div className="text-xs text-slate-400 mt-1">{item.id}</div>
+                        <div className="text-xs text-slate-500 mt-1">{item.note || "-"}</div>
+                      </td>
+                      <td className="p-4 text-slate-700">
+                        <div>{item.category}</div>
+                        <div className="text-xs text-slate-400 mt-1">{item.location || "-"}</div>
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${low ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>
+                          {item.quantity} {item.unit}
+                        </span>
+                      </td>
+                      <td className="p-4 text-slate-700 font-bold">{item.minQuantity} {item.unit}</td>
+                      <td className="p-4 text-slate-700">{item.supplier || "-"}</td>
+                      <td className="p-4 text-indigo-700 font-bold font-num">{formatCurrency(item.cost)}</td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => adjustQty(item, -1)} className="btn btn-outline px-3 py-2 rounded-xl">-1</button>
+                          <button onClick={() => adjustQty(item, 1)} className="btn btn-outline px-3 py-2 rounded-xl">+1</button>
+                          <button onClick={() => startEdit(item)} className="btn btn-primary px-3 py-2 rounded-xl">編輯</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {filtered.length === 0 && <div className="p-6 text-sm text-slate-400">沒有符合條件的倉庫品項</div>}
         </div>
       </div>
     );
@@ -6168,11 +6465,12 @@ const AdminView = ({ user }) => {
         </div>
 
         <nav className="space-y-1 flex-1">
-          {[
+          {[ 
             { id: "overview", label: "戰情儀表", icon: "layout-dashboard" },
             { id: "jobs", label: "全域工單", icon: "file-text" },
             { id: "users", label: "會員管理", icon: "users" },
             { id: "approvals", label: "審核中心", icon: "badge-check" },
+            { id: "inventory", label: "倉庫管理", icon: "package" },
             { id: "messages", label: "訊息中心", icon: "message-square" },
             { id: "finance", label: "金流對帳", icon: "wallet" },
             { id: "reports", label: "報表中心", icon: "bar-chart-3" },
@@ -6259,6 +6557,20 @@ const AdminView = ({ user }) => {
               <div className="card-modern p-5">
                 <div className="text-xs text-slate-400">平台淨現金</div>
                 <div className="text-xl font-bold text-slate-900 font-num">{formatCurrency(platformNetCash)}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">倉庫品項</div>
+                <div className="text-2xl font-bold text-slate-900 font-num">{inventoryItems.length}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">低庫存警示</div>
+                <div className="text-2xl font-bold text-rose-600 font-num">{lowStockInventory.length}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">倉庫價值</div>
+                <div className="text-2xl font-bold text-emerald-600 font-num">{formatCurrency(inventoryValue)}</div>
               </div>
             </div>
             <div className="card-modern p-5 mt-4">
@@ -6895,6 +7207,8 @@ const AdminView = ({ user }) => {
           </>
         )}
 
+        {view === "inventory" && <InventoryPanel />}
+
         {view === "messages" && (
           <>
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
@@ -6981,7 +7295,7 @@ const AdminView = ({ user }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="card-modern p-6">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2"><Icon name="database" size={18} /> 資料備份</h3>
-                <div className="text-sm text-slate-600 mt-2">匯出完整 users/jobs/audit 成為 snapshot JSON，可在另一台電腦匯入延續開發。</div>
+                <div className="text-sm text-slate-600 mt-2">匯出完整 users/jobs/audit/withdrawals/inventory 成為 snapshot JSON，可在另一台電腦匯入延續開發。</div>
                 <div className="flex gap-2 mt-4">
                   <button onClick={() => exportSnapshot()} className="btn btn-primary">匯出備份</button>
                   <button onClick={() => setImportOpen(true)} className="btn btn-outline">匯入還原</button>
@@ -7146,9 +7460,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
