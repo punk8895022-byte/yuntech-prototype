@@ -241,6 +241,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -2926,7 +2927,7 @@ const BottomNav = ({ active, onSelect, items }) => {
 };
 
 const ClientView = ({ user }) => {
-  const { jobs, setJobs, users, logout } = useApp();
+  const { jobs, setJobs, users, withdrawals, logout } = useApp();
   const [selectedJob, setSelectedJob] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editJob, setEditJob] = useState(null);
@@ -6878,9 +6879,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
