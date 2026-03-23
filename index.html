@@ -232,6 +232,8 @@
 
 
 
+
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -571,8 +573,21 @@ const mapsUrlForAddress = (address) => {
   return `https://www.google.com/maps/search/?api=1&query=${q}`;
 };
 
+const roleGroup = (role) => {
+  const value = String(role || "").trim().toLowerCase();
+  if (value.startsWith("client")) return "client";
+  if (value === "engineer" || value === "tech") return "engineer";
+  if (value === "admin") return "admin";
+  return "other";
+};
+
 const safeStorageSet = (key, value) => {
   try {
+    const bytes = typeof Blob !== "undefined" ? new Blob([value]).size : String(value || "").length * 2;
+    if (bytes > 3.5 * 1024 * 1024) {
+      console.warn(`Storage payload too large for key: ${key} (${Math.round(bytes / 1024)} KB)`);
+      return false;
+    }
     localStorage.setItem(key, value);
     return true;
   } catch (error) {
@@ -592,7 +607,7 @@ const safeStorageGet = (key, fallback) => {
   }
 };
 
-const compressImageFile = (file, maxWidth = 1280, quality = 0.82) =>
+const compressImageFile = (file, maxWidth = 960, quality = 0.68) =>
   new Promise((resolve, reject) => {
     if (!file || !file.type || !file.type.startsWith("image/")) {
       reject(new Error("不支援的圖片格式"));
@@ -616,7 +631,11 @@ const compressImageFile = (file, maxWidth = 1280, quality = 0.82) =>
           return;
         }
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
+        try {
+          resolve(canvas.toDataURL("image/webp", quality));
+        } catch {
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        }
       } catch (error) {
         reject(error);
       } finally {
@@ -724,7 +743,7 @@ const AppProvider = ({ children }) => {
       const accountMatch =
         String(item.email || "").trim().toLowerCase() === normalizedEmail || String(item.name || "").trim() === normalizedName;
       const passwordMatch = String(item.password || "") === String(password || "");
-      const roleMatch = !role || String(item.role || "") === String(role || "");
+      const roleMatch = !role || roleGroup(item.role) === roleGroup(role);
       return accountMatch && passwordMatch && roleMatch;
     }) || users.find((item) => {
       const accountMatch =
@@ -1290,7 +1309,7 @@ const DiagnosticsModal = ({ onClose }) => {
     try {
       const results = [];
 
-      const sampleClient = users.find((u) => String(u.role || "").startsWith("client")) || null;
+      const sampleClient = users.find((u) => roleGroup(u.role) === "client") || null;
       const sampleEng = users.find((u) => u.role === "engineer") || null;
 
       results.push({
@@ -1550,7 +1569,7 @@ const AuthScreen = () => {
       address: form.address,
       status: role === "engineer" ? "pending" : "active",
       avatar: form.name ? form.name[0] : "U",
-      wallet: String(role || "").startsWith("client") ? 100000 : 0,
+      wallet: roleGroup(role) === "client" ? 100000 : 0,
       ...(role === "client_business" ? { company: form.company || "", taxId: form.taxId || "" } : {}),
       ...(role === "engineer"
         ? {
@@ -2344,8 +2363,14 @@ const total = calcJobTotal(job);
   const handlePhoto = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
+    const remainingSlots = Math.max(0, 4 - photos.length);
+    if (remainingSlots === 0) {
+      addToast("完工照片最多 4 張，請先刪除舊照片再上傳", "error");
+      e.target.value = "";
+      return;
+    }
 
-    for (const file of files) {
+    for (const file of files.slice(0, remainingSlots)) {
       try {
         if ((Number(file.size) || 0) > 8 * 1024 * 1024) {
           addToast("圖片過大，請選擇 8MB 以下檔案", "error");
@@ -2470,7 +2495,7 @@ const total = calcJobTotal(job);
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 pb-32 space-y-6">
-          {(job.assignee || String(user.role || "").startsWith("client")) && (
+          {(job.assignee || roleGroup(user.role) === "client") && (
             <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={() => (peerUser ? setShowCall(true) : addToast("尚未媒合技師，暫無法通話", "error"))}
@@ -3259,7 +3284,7 @@ const ProfileModal = ({ user, onClose }) => {
 
   const isEngineer = user?.role === "engineer";
   const isClientBiz = user?.role === "client_business";
-  const roleLabel = isEngineer ? "技師" : user?.role?.startsWith("client") ? "客戶" : (user?.role || "");
+    const roleLabel = isEngineer ? "技師" : roleGroup(user?.role) === "client" ? "客戶" : (user?.role || "");
 
   const save = () => {
     const name = String(form.name || "").trim();
@@ -3849,7 +3874,7 @@ const AdminView = ({ user }) => {
   const getUserName = (id, fallback = "") => getUserById(id)?.name || fallback || "";
   const getUserPhone = (id) => getUserById(id)?.phone || "";
   const roleLabel = (role) => {
-    if (String(role).startsWith("client")) return "客戶";
+    if (roleGroup(role) === "client") return "客戶";
     if (role === "engineer") return "工程師";
     if (role === "admin") return "管理員";
     return role || "-";
@@ -3987,7 +4012,7 @@ const AdminView = ({ user }) => {
   }, [jobs]);
 
   const engineers = useMemo(() => users.filter((u) => u.role === "engineer"), [users]);
-  const clients = useMemo(() => users.filter((u) => String(u.role || "").startsWith("client")), [users]);
+  const clients = useMemo(() => users.filter((u) => roleGroup(u.role) === "client"), [users]);
   const admins = useMemo(() => users.filter((u) => u.role === "admin"), [users]);
 
   const filteredJobs = useMemo(() => {
@@ -6626,7 +6651,7 @@ const UnsupportedRoleScreen = ({ user, onLogout }) => (
 
 // --- App ---
 const App = () => {
-  const { user } = useApp();
+  const { user, logout } = useApp();
   const [showHelp, setShowHelp] = useState(false);
   const [showDiag, setShowDiag] = useState(false);
 
@@ -6636,7 +6661,7 @@ const App = () => {
         <AuthScreen />
       ) : user.role === "admin" ? (
         <AdminView user={user} />
-      ) : String(user.role || "").startsWith("client") ? (
+      ) : roleGroup(user.role) === "client" ? (
         <ClientView user={user} />
       ) : user.role === "engineer" || user.role === "tech" ? (
         <TechView user={user} />
@@ -6644,12 +6669,7 @@ const App = () => {
         <UnsupportedRoleScreen
           user={user}
           onLogout={() => {
-            try {
-              window.localStorage.removeItem("cl_user_v101");
-              window.location.reload();
-            } catch {
-              setShowHelp(true);
-            }
+            logout();
           }}
         />
       )}
@@ -6725,9 +6745,13 @@ root.render(
 
 
 
+
+
 </script>
   </body>
 </html>
+
+
 
 
 
