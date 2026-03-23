@@ -250,6 +250,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -2182,7 +2183,7 @@ const CallModal = ({ name, phone, onClose, addToast }) => {
   );
 };
 
-const ChatModal = ({ job, me, peer, onUpdate, onClose }) => {
+const ChatModal = ({ job, me, peer, onUpdate, onClose, onBack }) => {
   const [draft, setDraft] = useState("");
   const listRef = React.useRef(null);
 
@@ -2211,7 +2212,7 @@ const ChatModal = ({ job, me, peer, onUpdate, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[175] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
+    <div className="fixed inset-0 z-[190] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
       <div className="bg-white w-full max-w-2xl md:rounded-3xl rounded-t-3xl h-[85vh] md:h-[75vh] shadow-2xl overflow-hidden flex flex-col">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -2221,7 +2222,14 @@ const ChatModal = ({ job, me, peer, onUpdate, onClose }) => {
               <p className="text-xs text-slate-400">{peer?.name || "對方"} · {job.title}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+          <div className="flex items-center gap-2">
+            {onBack && (
+              <button onClick={onBack} className="px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold hover:bg-indigo-100">
+                返回列表
+              </button>
+            )}
+            <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+          </div>
         </div>
 
         <div ref={listRef} className="flex-1 overflow-y-auto p-6 space-y-3 bg-slate-50">
@@ -3049,7 +3057,7 @@ const ClientView = ({ user }) => {
         <ConversationsModal
           me={user}
           onClose={() => { setShowInbox(false); setNav("jobs"); }}
-          onOpen={(j) => { setChatJob(normalizeJob(j)); setShowInbox(false); }}
+          onOpen={(j) => { setChatJob(normalizeJob(j)); }}
         />
       )}
 
@@ -3063,7 +3071,8 @@ const ClientView = ({ user }) => {
             setChatJob(normalizeJob(u));
             setSelectedJob((prev) => (prev && prev.id === u.id ? normalizeJob(u) : prev));
           }}
-          onClose={() => { setChatJob(null); setNav("jobs"); }}
+          onBack={() => setChatJob(null)}
+          onClose={() => { setChatJob(null); setShowInbox(false); setNav("jobs"); }}
         />
       )}
 
@@ -3785,7 +3794,7 @@ const TechView = ({ user }) => {
         <ConversationsModal
           me={user}
           onClose={() => { setShowInbox(false); setNav("jobs"); }}
-          onOpen={(j) => { setChatJob(normalizeJob(j)); setShowInbox(false); }}
+          onOpen={(j) => { setChatJob(normalizeJob(j)); }}
         />
       )}
 
@@ -3799,7 +3808,8 @@ const TechView = ({ user }) => {
             setChatJob(normalizeJob(u));
             setSelectedJob((prev) => (prev && prev.id === u.id ? normalizeJob(u) : prev));
           }}
-          onClose={() => { setChatJob(null); setNav("jobs"); }}
+          onBack={() => setChatJob(null)}
+          onClose={() => { setChatJob(null); setShowInbox(false); setNav("jobs"); }}
         />
       )}
 
@@ -6962,9 +6972,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
