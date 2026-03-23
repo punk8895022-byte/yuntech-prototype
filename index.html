@@ -251,6 +251,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -2260,6 +2261,8 @@ const ChatModal = ({ job, me, peer, onUpdate, onClose, onBack }) => {
 
 const ConversationsModal = ({ me, onClose, onOpen }) => {
   const { jobs, users } = useApp();
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const relevant = me?.role === "engineer"
     ? jobs.filter((j) => j.assignee === me.id)
@@ -2274,10 +2277,27 @@ const ConversationsModal = ({ me, onClose, onOpen }) => {
       const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
       const lastTs = last?.ts || j.created_at || "";
       const preview = last?.text ? String(last.text).slice(0, 40) : "尚無訊息";
-      return { job: j, peer, lastTs, preview };
+      return { job: j, peer, lastTs, preview, msgCount: msgs.length };
     })
     .filter((r) => Boolean(r.peer))
     .sort((a, b) => String(b.lastTs).localeCompare(String(a.lastTs)));
+  const counts = rows.reduce((acc, r) => {
+    acc.all += 1;
+    acc[r.job.status] = (acc[r.job.status] || 0) + 1;
+    return acc;
+  }, { all: 0, open: 0, active: 0, completed: 0, closed: 0 });
+  const filteredRows = rows.filter((r) => {
+    const haystack = [
+      r.peer?.name,
+      r.job.title,
+      r.preview,
+      getStatusProgress(r.job.status).label,
+      roleLabel(r.peer?.role),
+    ].join(" ").toLowerCase();
+    const matchesQuery = !query.trim() || haystack.includes(query.trim().toLowerCase());
+    const matchesStatus = statusFilter === "all" || r.job.status === statusFilter;
+    return matchesQuery && matchesStatus;
+  });
 
   return (
     <div className="fixed inset-0 z-[176] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
@@ -2293,14 +2313,59 @@ const ConversationsModal = ({ me, onClose, onOpen }) => {
           <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
         </div>
 
-        <div className="p-4 overflow-y-auto flex-1 bg-slate-50">
-          {rows.length === 0 ? (
+        <div className="p-4 overflow-y-auto flex-1 bg-slate-50 space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">對話總數</div>
+              <div className="text-xl font-bold text-slate-900 font-num">{counts.all}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">施工中</div>
+              <div className="text-xl font-bold text-indigo-700 font-num">{counts.active}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">待驗收</div>
+              <div className="text-xl font-bold text-amber-600 font-num">{counts.completed}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">已完成</div>
+              <div className="text-xl font-bold text-emerald-600 font-num">{counts.closed}</div>
+            </div>
+          </div>
+
+          <div className="card-modern p-4 space-y-3">
+            <input
+              className="input-modern"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="搜尋客戶、工程師、案件標題、訊息內容"
+            />
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: "all", label: `全部 (${counts.all})` },
+                { id: "open", label: `媒合中 (${counts.open || 0})` },
+                { id: "active", label: `施工中 (${counts.active || 0})` },
+                { id: "completed", label: `待驗收 (${counts.completed || 0})` },
+                { id: "closed", label: `已完成 (${counts.closed || 0})` },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setStatusFilter(item.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${statusFilter === item.id ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filteredRows.length === 0 ? (
             <div className="p-6 text-center text-sm text-slate-400 bg-white border border-slate-200 rounded-2xl">
               目前沒有可開啟的對話 (需要已媒合的案件)
             </div>
           ) : (
             <div className="space-y-3">
-              {rows.map((r) => (
+              {filteredRows.map((r) => (
                 <button
                   key={r.job.id}
                   onClick={() => onOpen(r.job)}
@@ -2310,6 +2375,11 @@ const ConversationsModal = ({ me, onClose, onOpen }) => {
                     <div className="min-w-0">
                       <div className="text-sm font-bold text-slate-900 truncate">{r.peer?.name || "對方"} · {r.job.title}</div>
                       <div className="text-xs text-slate-500 mt-1 truncate">{r.preview}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px]">
+                        <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-600 font-bold">{roleLabel(r.peer?.role)}</span>
+                        <span className="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 font-bold">{getStatusProgress(r.job.status).label}</span>
+                        <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-700 font-bold">訊息 {r.msgCount}</span>
+                      </div>
                     </div>
                     <div className="text-[10px] text-slate-400 font-num shrink-0">{r.lastTs ? new Date(r.lastTs).toLocaleString() : ""}</div>
                   </div>
@@ -5630,6 +5700,27 @@ const AdminView = ({ user }) => {
   const approvedWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "approved"), [withdrawals]);
   const paidWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "paid"), [withdrawals]);
   const rejectedWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "rejected"), [withdrawals]);
+  const messageThreads = useMemo(() => {
+    return jobs
+      .map((j) => {
+        const msgs = Array.isArray(j.messages) ? j.messages : [];
+        if (msgs.length === 0) return null;
+        const last = msgs[msgs.length - 1];
+        const peer = getUserName(j.clientId, j.clientName) || getUserName(j.assignee) || "-";
+        return {
+          job: j,
+          count: msgs.length,
+          lastTs: last?.ts || j.created_at || "",
+          preview: last?.text ? String(last.text).slice(0, 60) : "尚無訊息",
+          peer,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => String(b.lastTs).localeCompare(String(a.lastTs)));
+  }, [jobs]);
+  const messageThreadsToday = useMemo(() => {
+    return messageThreads.filter((t) => t.lastTs && new Date(t.lastTs).toLocaleDateString() === todayKey);
+  }, [messageThreads, todayKey]);
   const jobAuditQueue = useMemo(() => {
     return jobs
       .map((j) => {
@@ -6074,6 +6165,7 @@ const AdminView = ({ user }) => {
             { id: "jobs", label: "全域工單", icon: "file-text" },
             { id: "users", label: "會員管理", icon: "users" },
             { id: "approvals", label: "審核中心", icon: "badge-check" },
+            { id: "messages", label: "訊息中心", icon: "message-square" },
             { id: "finance", label: "金流對帳", icon: "wallet" },
             { id: "reports", label: "報表中心", icon: "bar-chart-3" },
             { id: "settings", label: "系統設定", icon: "settings" },
@@ -6795,6 +6887,77 @@ const AdminView = ({ user }) => {
           </>
         )}
 
+        {view === "messages" && (
+          <>
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">訊息中心</h2>
+                <div className="text-sm text-slate-500 mt-1">追蹤客戶與工程師的案件對話，避免溝通黑盒化</div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setView("jobs")} className="btn btn-outline px-4 py-2 rounded-xl">前往工單</button>
+                <button onClick={() => setView("users")} className="btn btn-outline px-4 py-2 rounded-xl">前往會員管理</button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">對話案件數</div>
+                <div className="text-2xl font-bold text-slate-900 font-num">{messageThreads.length}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">今日最新訊息</div>
+                <div className="text-2xl font-bold text-indigo-700 font-num">{messageThreadsToday.length}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">總訊息數</div>
+                <div className="text-2xl font-bold text-emerald-600 font-num">{messageThreads.reduce((acc, t) => acc + t.count, 0)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">待追蹤案件</div>
+                <div className="text-2xl font-bold text-rose-600 font-num">{messageThreads.filter((t) => getJobRiskState(t.job).tone !== "ok").length}</div>
+              </div>
+            </div>
+
+            <div className="card-modern p-6 mt-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-bold text-slate-800">案件訊息列表</h3>
+                  <div className="text-xs text-slate-400 mt-1">點擊可查看工單或進一步處理案件</div>
+                </div>
+                <div className="text-xs text-slate-400">依最近訊息時間排序</div>
+              </div>
+              {messageThreads.length === 0 ? (
+                <div className="text-sm text-slate-400">目前沒有任何案件訊息</div>
+              ) : (
+                <div className="space-y-3">
+                  {messageThreads.slice(0, 12).map((t) => {
+                    const risk = getJobRiskState(t.job);
+                    return (
+                      <div key={t.job.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-bold">{getStatusProgress(t.job.status).label}</span>
+                            <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">{t.count} 則訊息</span>
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${risk.tone === "danger" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{risk.label}</span>
+                          </div>
+                          <div className="font-bold text-slate-800 mt-2 truncate">{t.job.title}</div>
+                          <div className="text-xs text-slate-500 mt-1 truncate">{t.peer} · {t.preview}</div>
+                          <div className="text-[10px] text-slate-400 mt-1">{t.lastTs ? new Date(t.lastTs).toLocaleString() : "-"}</div>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <button onClick={() => setInspectJob(t.job)} className="btn btn-outline px-3 py-2 rounded-xl">查看工單</button>
+                          <button onClick={() => setEditJob(t.job)} className="btn btn-primary px-3 py-2 rounded-xl">處理工單</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
         {view === "finance" && <FinancePanel />}
         {view === "reports" && <ReportsPanel />}
 
@@ -6973,9 +7136,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
