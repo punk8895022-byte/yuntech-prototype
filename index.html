@@ -238,6 +238,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -2976,6 +2977,18 @@ const ClientView = ({ user }) => {
     return records.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   }, [myJobs]);
   const paidTotal = paymentRecords.reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
+  const pendingTail = useMemo(
+    () =>
+      myJobs
+        .filter((j) => j.status === "completed" || (j.status === "closed" && !j.tail_paid))
+        .reduce((acc, j) => {
+          const total = calcJobTotal(j);
+          const dep = Number(j.depositAmount) || calcDeposit(total);
+          const tail = Number(j.tailAmount) || (total - dep);
+          return acc + tail;
+        }, 0),
+    [myJobs]
+  );
 
   const jobTabs = [
     { id: "all", label: "全部", count: myJobs.length },
@@ -6854,9 +6867,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
