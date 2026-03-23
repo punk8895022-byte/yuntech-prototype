@@ -230,6 +230,8 @@
 
 
 
+
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -2943,6 +2945,32 @@ const ClientView = ({ user }) => {
           <div>申請中：{formatCurrency(pendingWithdrawTotal)}</div>
           <div>已核准待匯：{formatCurrency(approvedWithdrawTotal)}</div>
           <div>已匯款：{formatCurrency(paidWithdrawTotal)}</div>
+        </div>
+        <div className="mt-3 bg-white border border-slate-200 rounded-2xl p-4">
+          <div className="text-xs font-bold text-slate-500 mb-2">已結案工程明細</div>
+          {completedIncomeJobs.length === 0 ? (
+            <div className="text-xs text-slate-400">尚無已結案案件</div>
+          ) : (
+            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+              {completedIncomeJobs.slice(0, 8).map((j) => {
+                const total = calcJobTotal(j);
+                const dep = Number(j.depositAmount) || calcDeposit(total);
+                const tail = Number(j.tailAmount) || (total - dep);
+                return (
+                  <div key={j.id} className="flex items-center justify-between text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-800 truncate">{j.title}</div>
+                      <div className="text-slate-400 mt-1">{j.paidAt ? new Date(j.paidAt).toLocaleDateString() : "-"}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-indigo-700 font-num">{formatCurrency(total)}</div>
+                      <div className="text-[10px] text-slate-400">尾款 {formatCurrency(tail)}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -6570,6 +6598,32 @@ const AdminView = ({ user }) => {
 };
 
 
+const UnsupportedRoleScreen = ({ user, onLogout }) => (
+  <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+    <div className="w-full max-w-xl card-modern p-8">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center">
+          <Icon name="shield-alert" size={24} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">帳號角色異常</h2>
+          <p className="text-sm text-slate-500 mt-1">系統已阻止進入主頁，以避免因舊資料或錯誤角色造成白屏。</p>
+        </div>
+      </div>
+
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-700 space-y-2">
+        <div><span className="font-bold">目前登入：</span>{user?.name || "-"}</div>
+        <div><span className="font-bold">角色值：</span>{String(user?.role || "-")}</div>
+        <div><span className="font-bold">建議處理：</span>請登出後以正確帳號重新登入，或到後台修正會員角色。</div>
+      </div>
+
+      <div className="flex flex-wrap gap-3 mt-6">
+        <button onClick={onLogout} className="btn btn-primary px-5 py-3 rounded-xl">登出重登</button>
+      </div>
+    </div>
+  </div>
+);
+
 // --- App ---
 const App = () => {
   const { user } = useApp();
@@ -6584,8 +6638,20 @@ const App = () => {
         <AdminView user={user} />
       ) : String(user.role || "").startsWith("client") ? (
         <ClientView user={user} />
-      ) : (
+      ) : user.role === "engineer" || user.role === "tech" ? (
         <TechView user={user} />
+      ) : (
+        <UnsupportedRoleScreen
+          user={user}
+          onLogout={() => {
+            try {
+              window.localStorage.removeItem("cl_user_v101");
+              window.location.reload();
+            } catch {
+              setShowHelp(true);
+            }
+          }}
+        />
       )}
 
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} onDiagnostics={() => { setShowHelp(false); setShowDiag(true); }} />}
@@ -6657,9 +6723,13 @@ root.render(
 
 
 
+
+
 </script>
   </body>
 </html>
+
+
 
 
 
