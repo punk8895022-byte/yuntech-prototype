@@ -240,6 +240,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -2978,6 +2979,7 @@ const ClientView = ({ user }) => {
     return records.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   }, [myJobs]);
   const paidTotal = paymentRecords.reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
+  const myWithdrawals = useMemo(() => withdrawals.filter((w) => w.userId === user.id), [withdrawals, user.id]);
   const pendingTail = useMemo(
     () =>
       myJobs
@@ -6875,9 +6877,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
