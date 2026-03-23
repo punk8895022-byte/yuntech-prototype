@@ -218,6 +218,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -4649,6 +4650,17 @@ const AdminView = ({ user }) => {
 
   const UserInspectModal = ({ data, onClose }) => {
     const u = data;
+    const memberJobs = jobs.filter((j) => j.clientId === u.id || j.assignee === u.id);
+    const memberClosedJobs = memberJobs.filter((j) => j.status === "closed");
+    const memberActiveJobs = memberJobs.filter((j) => j.status === "active" || j.status === "completed");
+    const memberRevenue = memberClosedJobs.reduce((acc, j) => acc + calcJobTotal(j), 0);
+    const memberPendingTail = memberJobs.filter((j) => j.status !== "closed").reduce((acc, j) => {
+      const total = calcJobTotal(j);
+      const dep = Number(j.depositAmount) || calcDeposit(total);
+      return acc + (Number(j.tailAmount) || (total - dep));
+    }, 0);
+    const memberWithdrawals = withdrawals.filter((w) => w.userId === u.id);
+    const memberWithdrawnTotal = memberWithdrawals.filter((w) => w.status === "paid" || w.status === "approved").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
     return (
       <div className="fixed inset-0 z-[220] bg-black/50 flex items-start justify-center p-4 py-6 overflow-y-auto">
         <div className="bg-white w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -4670,6 +4682,35 @@ const AdminView = ({ user }) => {
             {Array.isArray(u.skills) && u.skills.length > 0 && (
               <div className="md:col-span-2"><span className="text-xs text-slate-400 block">技能</span>{u.skills.join(", ")}</div>
             )}
+          </div>
+          <div className="px-6 pb-2 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">案件數</div>
+              <div className="text-xl font-bold text-slate-800 font-num">{memberJobs.length}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">已結案</div>
+              <div className="text-xl font-bold text-emerald-600 font-num">{memberClosedJobs.length}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">未結案應收</div>
+              <div className="text-xl font-bold text-amber-600 font-num">{formatCurrency(memberPendingTail)}</div>
+            </div>
+            <div className="card-modern p-4">
+              <div className="text-xs text-slate-400">已入帳</div>
+              <div className="text-xl font-bold text-indigo-700 font-num">{formatCurrency(memberRevenue || memberWithdrawnTotal)}</div>
+            </div>
+          </div>
+          <div className="px-6 pb-6">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs font-bold text-slate-500 mb-2">最近狀況</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">
+                <div>進行中 / 待驗收：{memberActiveJobs.length}</div>
+                <div>提領紀錄：{memberWithdrawals.length}</div>
+                <div>最近提領：{memberWithdrawals.length > 0 ? withdrawalStatusLabel(memberWithdrawals[0].status) : "-"}</div>
+                <div>角色：{roleLabel(u.role)}</div>
+              </div>
+            </div>
           </div>
           <div className="p-6 border-t flex gap-3">
             <button onClick={() => { setEditUser(u); onClose(); }} className="flex-1 btn btn-outline">編輯會員</button>
@@ -4698,6 +4739,8 @@ const AdminView = ({ user }) => {
     };
 
     const total = calcJobTotal(form);
+    const draftRisk = getJobRiskState(form);
+    const draftNextAction = getJobNextAction(form);
 
     return (
       <div className="fixed inset-0 z-[220] bg-black/50 flex items-start justify-center p-4 py-6 overflow-y-auto">
@@ -4708,6 +4751,21 @@ const AdminView = ({ user }) => {
               <h3 className="font-bold text-lg">編輯工單</h3>
             </div>
             <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-400">風險</div>
+              <div className={`text-lg font-bold ${draftRisk.tone === "danger" ? "text-rose-600" : draftRisk.tone === "warning" ? "text-amber-600" : "text-emerald-600"}`}>{draftRisk.label}</div>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-400">下一步</div>
+              <div className="text-lg font-bold text-indigo-700">{draftNextAction}</div>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-400">時間軸</div>
+              <StatusTimeline status={form.status || "open"} />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -4860,6 +4918,9 @@ const AdminView = ({ user }) => {
     const total = calcJobTotal(j);
     const dep = Number(j.depositAmount) || calcDeposit(total);
     const tail = Number(j.tailAmount) || calcTail(total);
+    const jobRisk = getJobRiskState(j);
+    const jobNextAction = getJobNextAction(j);
+    const jobAgeDays = getJobAgeDays(j);
 
     return (
       <div className="fixed inset-0 z-[220] bg-black/50 flex items-start justify-center p-4 py-6 overflow-y-auto">
@@ -4897,7 +4958,6 @@ const AdminView = ({ user }) => {
               <div className="text-xs text-slate-400 mt-2">建立 {j.created_at ? new Date(j.created_at).toLocaleString() : "-"}</div>
             </div>
           </div>
-
           <div className="px-6 pb-2 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="card-modern p-4">
               <div className="text-xs text-slate-400">案件年齡</div>
@@ -4987,6 +5047,41 @@ const AdminView = ({ user }) => {
   const unassignedJobs = useMemo(() => jobs.filter((j) => j.status === "open" && !j.assignee), [jobs]);
   const waitingAcceptanceJobs = useMemo(() => jobs.filter((j) => j.status === "completed"), [jobs]);
   const activeNoArrivalJobs = useMemo(() => jobs.filter((j) => j.status === "active" && !j.techArrived), [jobs]);
+  const topClients = useMemo(() => {
+    return clients
+      .map((c) => {
+        const memberJobs = jobs.filter((j) => j.clientId === c.id);
+        const paidJobs = memberJobs.filter((j) => j.status === "closed");
+        const total = paidJobs.reduce((acc, j) => acc + calcJobTotal(j), 0);
+        return {
+          ...c,
+          jobs: memberJobs.length,
+          closed: paidJobs.length,
+          total,
+          avg: memberJobs.length ? Math.round(total / memberJobs.length) : 0,
+        };
+      })
+      .sort((a, b) => b.total - a.total || b.jobs - a.jobs)
+      .slice(0, 5);
+  }, [clients, jobs]);
+  const topEngineers = useMemo(() => {
+    return engineers
+      .map((e) => {
+        const memberJobs = jobs.filter((j) => j.assignee === e.id);
+        const closedJobs = memberJobs.filter((j) => j.status === "closed");
+        const pendingWithdrawals = withdrawals.filter((w) => w.userId === e.id && w.status === "pending").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+        const paidWithdrawals = withdrawals.filter((w) => w.userId === e.id && w.status === "paid").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+        return {
+          ...e,
+          jobs: memberJobs.length,
+          closed: closedJobs.length,
+          pendingWithdrawals,
+          paidWithdrawals,
+        };
+      })
+      .sort((a, b) => b.closed - a.closed || b.jobs - a.jobs)
+      .slice(0, 5);
+  }, [engineers, jobs, withdrawals]);
 
   const ReportsPanel = () => {
     return (
@@ -5513,6 +5608,52 @@ const AdminView = ({ user }) => {
                       </div>
                     );
                   })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
+              <div className="card-modern p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-slate-800">客戶營收排行</h3>
+                  <span className="text-xs text-slate-400">Top 5</span>
+                </div>
+                <div className="space-y-2">
+                  {topClients.map((c, idx) => (
+                    <div key={c.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-bold text-slate-800">#{idx + 1} {c.name}</div>
+                        <div className="text-xs text-slate-500 mt-1">案件 {c.jobs} | 已結案 {c.closed}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-indigo-700 font-num">{formatCurrency(c.total)}</div>
+                        <div className="text-xs text-slate-400">平均 {formatCurrency(c.avg)}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {topClients.length === 0 && <div className="text-sm text-slate-400">目前沒有客戶資料</div>}
+                </div>
+              </div>
+
+              <div className="card-modern p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-slate-800">工程師績效排行</h3>
+                  <span className="text-xs text-slate-400">Top 5</span>
+                </div>
+                <div className="space-y-2">
+                  {topEngineers.map((e, idx) => (
+                    <div key={e.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-bold text-slate-800">#{idx + 1} {e.name}</div>
+                        <div className="text-xs text-slate-500 mt-1">已完工 {e.closed} | 接案 {e.jobs}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-emerald-600 font-num">{formatCurrency(e.paidWithdrawals)}</div>
+                        <div className="text-xs text-slate-400">待審 {formatCurrency(e.pendingWithdrawals)}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {topEngineers.length === 0 && <div className="text-sm text-slate-400">目前沒有工程師資料</div>}
+                </div>
               </div>
             </div>
 
@@ -6092,9 +6233,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
