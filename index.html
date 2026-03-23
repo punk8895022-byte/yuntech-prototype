@@ -32,6 +32,12 @@
         background-color: var(--bg-body);
         color: #334155;
         -webkit-tap-highlight-color: transparent;
+        overflow-x: hidden;
+      }
+      html,
+      body,
+      #root {
+        min-height: 100%;
       }
 
       .font-num {
@@ -181,6 +187,8 @@
   <body>
     <div id="root"></div>
     <script type="text/babel">
+
+
 
 
 
@@ -641,8 +649,21 @@ const AppProvider = ({ children }) => {
     if (latest && latest !== user) setUser(latest);
   }, [users, user]);
 
-  const login = (email, password) => {
-    const u = users.find((u) => (u.email === email || u.name === email) && u.password === password);
+  const login = (email, password, role) => {
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedName = String(email || "").trim();
+    const u = users.find((item) => {
+      const accountMatch =
+        String(item.email || "").trim().toLowerCase() === normalizedEmail || String(item.name || "").trim() === normalizedName;
+      const passwordMatch = String(item.password || "") === String(password || "");
+      const roleMatch = !role || String(item.role || "") === String(role || "");
+      return accountMatch && passwordMatch && roleMatch;
+    }) || users.find((item) => {
+      const accountMatch =
+        String(item.email || "").trim().toLowerCase() === normalizedEmail || String(item.name || "").trim() === normalizedName;
+      const passwordMatch = String(item.password || "") === String(password || "");
+      return accountMatch && passwordMatch;
+    });
     if (u) {
       setUser(u);
       return true;
@@ -1408,6 +1429,7 @@ const AuthScreen = () => {
   const { login, registerUser, resetData } = useApp();
   const [view, setView] = useState("landing");
   const [role, setRole] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -1465,15 +1487,41 @@ const AuthScreen = () => {
   };
 
   const handleLogin = () => {
-    const success = login(form.email, form.password);
-    if (!success) addToast("帳號或密碼錯誤", "error");
-    else addToast("登入成功", "success");
+    const email = String(form.email || "").trim();
+    const password = String(form.password || "").trim();
+    if (!email || !password) {
+      addToast("請輸入帳號與密碼", "error");
+      return;
+    }
+    setIsLoggingIn(true);
+    try {
+      const success = login(email, password, role || undefined);
+      if (!success) addToast("帳號或密碼錯誤，請確認資料是否正確", "error");
+      else addToast("登入成功", "success");
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   const quickLogin = (type) => {
-    if (type === "client") login("client", "123");
-    if (type === "tech") login("tech", "123");
-    if (type === "admin") login("admin", "123");
+    if (type === "client") {
+      setRole("client_personal");
+      setView("login");
+      setForm((prev) => ({ ...prev, email: "client", password: "123" }));
+      login("client", "123");
+    }
+    if (type === "tech") {
+      setRole("engineer");
+      setView("login");
+      setForm((prev) => ({ ...prev, email: "tech", password: "123" }));
+      login("tech", "123");
+    }
+    if (type === "admin") {
+      setRole("admin");
+      setView("login");
+      setForm((prev) => ({ ...prev, email: "admin", password: "123" }));
+      login("admin", "123");
+    }
   };
 
   if (view === "landing")
@@ -1539,8 +1587,11 @@ const AuthScreen = () => {
           <input className="input-modern" placeholder="Email / 帳號" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <input className="input-modern" type="password" placeholder="密碼" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
 
-          <button onClick={() => (view === "login" ? handleLogin() : handleRegister())} className="w-full btn btn-primary px-4 py-3 rounded-xl font-bold shadow-lg">
-            {view === "login" ? "登入" : "提交註冊"}
+          <button
+            onClick={() => (view === "login" ? handleLogin() : handleRegister())}
+            className={`w-full btn btn-primary px-4 py-3 rounded-xl font-bold shadow-lg ${isLoggingIn ? "opacity-70 pointer-events-none" : ""}`}
+          >
+            {view === "login" ? (isLoggingIn ? "登入中..." : "登入") : "提交註冊"}
           </button>
         </div>
 
@@ -6234,9 +6285,13 @@ root.render(
 
 
 
+
+
 </script>
   </body>
 </html>
+
+
 
 
 
