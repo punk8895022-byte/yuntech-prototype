@@ -248,6 +248,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -813,6 +814,7 @@ const AppProvider = ({ children }) => {
   useEffect(() => {
     safeStorageSet("cl_withdrawals_v101", JSON.stringify(withdrawals));
   }, [withdrawals]);
+  globalThis.__cloudlink_users_ref = users;
   useEffect(() => {
     if (!user) return;
     const latest = users.find((u) => u.id === user.id);
@@ -916,6 +918,11 @@ const AppProvider = ({ children }) => {
 };
 
 const useApp = () => useContext(AppContext);
+
+const getUserName = (id, fallback = "") => {
+  const users = Array.isArray(globalThis.__cloudlink_users_ref) ? globalThis.__cloudlink_users_ref : [];
+  return users.find((u) => u.id === id)?.name || fallback || "";
+};
 
 // --- [3. UI Components] ---
 const ToastContext = createContext(null);
@@ -6889,9 +6896,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
