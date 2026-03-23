@@ -214,12 +214,17 @@ const normalizeJob = (job) => {
     ? job.supplementPhotos.map((p) => trimDataUrl(p)).filter(Boolean).slice(0, MAX_JOB_PHOTOS)
     : [];
   const supplementPhotoMeta = sanitizePhotoMeta(supplementPhotos, job.supplementPhotoMeta);
+  const tailSettled = Boolean(job.tail_paid ?? false) || Boolean(job.paidAt);
+  const shouldReopenForAcceptance =
+    String(job.status ?? "open") === "closed" &&
+    !tailSettled &&
+    (Boolean(job.acceptanceFlag) || String(job.auditStatus || "") === "needs_fix" || Boolean(job.supplementAt));
 
   return {
     id: job.id ?? `J-${Date.now()}`,
     title: job.title ?? "",
     type: job.type ?? "",
-    status: job.status ?? "open",
+    status: shouldReopenForAcceptance ? "completed" : (job.status ?? "open"),
     clientId: job.clientId ?? job.client_id ?? null,
     clientName: job.clientName ?? job.client_name ?? "",
     address: job.address ?? job.clientAddress ?? job.client_address ?? "",
@@ -404,12 +409,23 @@ const getJobSlaDays = (status) => {
 
 const getJobNextAction = (job) => {
   if (!job) return "待補資料";
-  if (job.auditStatus === "needs_fix" && !(job.supplementAt || (Array.isArray(job.supplementPhotos) && job.supplementPhotos.length > 0))) return "等待工程師補件";
-  if (job.supplementAt && job.auditStatus === "unreviewed") return "等待管理端複查";
+  const hasSupplement = Boolean(job.supplementAt || (Array.isArray(job.supplementPhotos) && job.supplementPhotos.length > 0));
+  if (job.auditStatus === "needs_fix" && !hasSupplement) return "等待工程師補件";
+  if (hasSupplement && job.auditStatus === "unreviewed" && job.acceptanceFlag) return "等待客戶再次驗收";
+  if (hasSupplement && job.auditStatus === "unreviewed" && !job.acceptanceFlag) return "等待管理端複查";
   if (job.status === "open") return job.assignee ? "等待技師確認" : "等待指派技師";
   if (job.status === "active") return job.techArrived ? "等待完工回報" : "等待抵達打卡";
-  if (job.status === "completed") return job.acceptanceFlag ? "等待管理端複查" : "等待客戶驗收";
-  if (job.status === "closed") return job.auditStatus === "needs_fix" ? "已結案，待補件" : "案件已結案";
+  if (job.status === "completed") {
+    if (job.acceptanceFlag && !hasSupplement) return "等待工程師補件";
+    if (job.acceptanceFlag && hasSupplement) return "等待客戶再次驗收";
+    return "等待客戶驗收";
+  }
+  if (job.status === "closed") {
+    if (job.auditStatus === "needs_fix" && !hasSupplement) return "已結案，待補件";
+    if (job.acceptanceFlag && hasSupplement && !job.tail_paid && !job.paidAt) return "等待客戶再次驗收";
+    if (hasSupplement && job.auditStatus === "unreviewed") return "等待管理端複查";
+    return "案件已結案";
+  }
   return "待補資料";
 };
 
@@ -2249,6 +2265,11 @@ const total = calcJobTotal(job);
       : (Array.isArray(job.supplementPhotos) ? job.supplementPhotos.map(() => ({ note: "", mark: "" })) : [])
   );
   const [supplementAt, setSupplementAt] = useState(job.supplementAt || null);
+  const supplementEvidenceReady = Boolean(supplementAt || job.supplementAt || (Array.isArray(job.supplementPhotos) && job.supplementPhotos.length > 0));
+  const paymentSettled = Boolean(job.tail_paid || job.paidAt);
+  const acceptanceActionLabel = acceptanceFlag
+    ? (supplementEvidenceReady ? "補件完成，驗收付款" : "送出異常驗收，等待工程師補件")
+    : "驗收付款";
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
   const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
   const [photoViewerList, setPhotoViewerList] = useState([]);
@@ -2300,6 +2321,32 @@ const total = calcJobTotal(job);
         addToast("已標記異常，請填寫驗收備註", "error");
         return;
       }
+      if (paymentSettled) {
+        addToast("此案件已完成驗收付款", "error");
+        return;
+      }
+
+      if (acceptanceFlag && !supplementEvidenceReady) {
+        const nextAuditAt = new Date().toISOString();
+        onUpdate({
+          ...job,
+          status: "completed",
+          tail_paid: false,
+          paidAt: null,
+          releasedTotal: null,
+          acceptanceNote,
+          acceptanceFlag,
+          acceptanceAt: nextAuditAt,
+          acceptanceBy: user?.id || null,
+          auditStatus: "needs_fix",
+          auditNote: acceptanceNote || job.auditNote || "",
+          auditAt: job.auditAt || nextAuditAt,
+          auditBy: job.auditBy || user?.id || null,
+        });
+        addToast("已送出異常驗收，待工程師補件完成後再驗收付款", "success");
+        return;
+      }
+
       const client = users.find((u) => u.id === job.clientId);
       const tech = users.find((u) => u.id === job.assignee);
 
@@ -2331,8 +2378,8 @@ const total = calcJobTotal(job);
         acceptanceFlag,
         acceptanceAt: new Date().toISOString(),
         acceptanceBy: user?.id || null,
-        auditStatus: acceptanceFlag ? "needs_fix" : (job.auditStatus || "unreviewed"),
-        auditNote: acceptanceFlag ? (acceptanceNote || job.auditNote || "") : (job.auditNote || ""),
+        auditStatus: job.auditStatus || "unreviewed",
+        auditNote: job.auditNote || "",
       });
       addToast("驗收付款完成，案件結案", "success");
       onClose();
@@ -2730,6 +2777,13 @@ const total = calcJobTotal(job);
                         value={acceptanceNote}
                         onChange={(e) => setAcceptanceNote(e.target.value)}
                       />
+                      {acceptanceFlag && (
+                        <div className={`rounded-2xl p-3 text-xs ${supplementEvidenceReady ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-amber-50 text-amber-700 border border-amber-100"}`}>
+                          {supplementEvidenceReady
+                            ? "工程師已補件完成，請再次確認內容後按驗收付款。"
+                            : "已標記異常，等待工程師補件完成後才能驗收付款。"}
+                        </div>
+                      )}
                     </div>
                   )}
                   {job.status === "closed" && (
@@ -2935,7 +2989,14 @@ const total = calcJobTotal(job);
 
         <div className="p-6 border-t bg-white sticky bottom-0">
           {job.status === "open" && isEng && <button onClick={() => handleAction("take")} className="w-full btn btn-primary shadow-xl shadow-indigo-200">立即接案</button>}
-          {job.status === "completed" && !isEng && <button onClick={() => handleAction("pay")} className="w-full btn btn-primary bg-green-600 shadow-xl shadow-green-200">驗收付款</button>}
+          {!isEng && (job.status === "completed" || (job.status === "closed" && !paymentSettled)) && (
+            <button
+              onClick={() => handleAction("pay")}
+              className={`w-full btn btn-primary bg-green-600 shadow-xl shadow-green-200 ${paymentSettled ? "opacity-50 pointer-events-none" : ""}`}
+            >
+              {acceptanceActionLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -2994,7 +3055,7 @@ const ClientView = ({ user }) => {
   }, [jobTab, myJobs]);
   const openJobs = useMemo(() => myJobs.filter((j) => j.status === "open"), [myJobs]);
   const activeJobs = useMemo(() => myJobs.filter((j) => j.status === "active"), [myJobs]);
-  const pendingAcceptJobs = useMemo(() => myJobs.filter((j) => j.status === "completed"), [myJobs]);
+  const pendingAcceptJobs = useMemo(() => myJobs.filter((j) => !j.tail_paid && !j.paidAt && (j.status === "completed" || (j.status === "closed" && j.acceptanceFlag))), [myJobs]);
   const closedJobs = useMemo(() => myJobs.filter((j) => j.status === "closed"), [myJobs]);
   const overdueJobs = useMemo(() => myJobs.filter((j) => getJobRiskState(j).tone === "danger"), [myJobs]);
   const billingRecords = useMemo(() => {
@@ -3345,10 +3406,24 @@ const ClientView = ({ user }) => {
                 <button onClick={(e) => { e.stopPropagation(); setEditJob(j); }} className="btn btn-outline px-3 py-2 rounded-xl">編輯案件</button>
               </div>
             )}
-            {j.status === "completed" && (
+            {j.status === "completed" && !j.acceptanceFlag && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button onClick={(e) => { e.stopPropagation(); setSelectedJob(j); setJobActionMode("pay"); }} className="btn btn-primary px-3 py-2 rounded-xl">驗收付款</button>
                 <button onClick={(e) => { e.stopPropagation(); setSelectedJob(j); setJobActionMode("issue"); }} className="btn btn-danger px-3 py-2 rounded-xl">回報異常 / 需補件</button>
+              </div>
+            )}
+            {j.status === "completed" && j.acceptanceFlag && !(j.supplementAt || (Array.isArray(j.supplementPhotos) && j.supplementPhotos.length > 0)) && (
+              <div className="mt-3 space-y-2">
+                <div className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                  已回報異常，等待工程師補件完成
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); setSelectedJob(j); }} className="btn btn-outline px-3 py-2 rounded-xl">查看補件進度</button>
+              </div>
+            )}
+            {j.status === "completed" && j.acceptanceFlag && (j.supplementAt || (Array.isArray(j.supplementPhotos) && j.supplementPhotos.length > 0)) && !j.tail_paid && !j.paidAt && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button onClick={(e) => { e.stopPropagation(); setSelectedJob(j); setJobActionMode("pay"); }} className="btn btn-primary px-3 py-2 rounded-xl">補件完成驗收</button>
+                <button onClick={(e) => { e.stopPropagation(); setSelectedJob(j); }} className="btn btn-outline px-3 py-2 rounded-xl">查看補件內容</button>
               </div>
             )}
           </div>
