@@ -215,6 +215,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -492,11 +493,19 @@ const USER_STATUS_LABEL = {
   suspended: "已停權",
 };
 
+const WITHDRAWAL_STATUS_LABEL = {
+  pending: "待審核",
+  approved: "已核准待匯",
+  paid: "已匯款",
+  rejected: "已拒絕",
+};
+
 const getStatusProgress = (status) => {
   return JOB_STATUS_FLOW.find((s) => s.id === status) || JOB_STATUS_FLOW[0];
 };
 
 const userStatusLabel = (status) => USER_STATUS_LABEL[status] || status || "-";
+const withdrawalStatusLabel = (status) => WITHDRAWAL_STATUS_LABEL[status] || status || "-";
 
 // Deterministic pseudo distance for demo (no GPS required).
 const pseudoDistanceKm = (seed) => {
@@ -2863,7 +2872,6 @@ const WalletModal = ({ user, pendingTail, onWithdraw, onClose }) => {
   const { withdrawals } = useApp();
   const wallet = Number(user.wallet) || 0;
   const myWithdrawals = withdrawals.filter((w) => w.userId === user.id);
-  const statusLabel = (s) => (s === "approved" ? "已通過" : s === "rejected" ? "已拒絕" : "待審核");
 
   return (
     <div className="fixed inset-0 z-[180] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-enter">
@@ -2912,7 +2920,7 @@ const WalletModal = ({ user, pendingTail, onWithdraw, onClose }) => {
                 {myWithdrawals.slice(0, 8).map((w) => (
                   <div key={w.id} className="flex items-center justify-between text-xs bg-white border border-slate-200 rounded-lg px-3 py-2">
                     <div>
-                      <div className="font-bold">{statusLabel(w.status)}</div>
+                      <div className="font-bold">{withdrawalStatusLabel(w.status)}</div>
                       <div className="text-slate-400">申請：{w.createdAt ? new Date(w.createdAt).toLocaleString() : "-"}</div>
                       <div className="text-slate-400">預計匯款：{w.scheduledAt ? new Date(w.scheduledAt).toLocaleString() : "-"}</div>
                     </div>
@@ -3168,7 +3176,7 @@ const TechView = ({ user }) => {
     }, 0);
 
   const myWithdrawals = useMemo(() => withdrawals.filter((w) => w.userId === user.id), [withdrawals, user.id]);
-  const withdrawnTotal = myWithdrawals.filter((w) => w.status === "approved").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
+  const withdrawnTotal = myWithdrawals.filter((w) => w.status === "approved" || w.status === "paid").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
   const pendingWithdrawTotal = myWithdrawals.filter((w) => w.status === "pending").reduce((acc, w) => acc + (Number(w.amount) || 0), 0);
   const earnedTotal = useMemo(() => {
     return jobs
@@ -3408,7 +3416,7 @@ const AdminView = ({ user }) => {
   const { jobs, setJobs, users, setUsers, withdrawals, setWithdrawals, updateUser, updateWithdrawal, logout, resetData } = useApp();
   const { addToast } = useToast();
 
-  // Views: overview | jobs | users | approvals | reports | settings
+  // Views: overview | jobs | users | approvals | finance | reports | settings
   const [view, setView] = useState("overview");
 
   // Modals
@@ -3421,6 +3429,7 @@ const AdminView = ({ user }) => {
   const [createJobOpen, setCreateJobOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [financeTab, setFinanceTab] = useState("payments");
 
   // Filters
   const [qJobs, setQJobs] = useState("");
@@ -3473,6 +3482,12 @@ const AdminView = ({ user }) => {
     if (v === "unreviewed" || !v) return "未稽核";
     return v;
   };
+  const financePaymentLabel = (j) => {
+    if (j.status === "closed") return j.tail_paid ? "已結清" : "待匯尾款";
+    if (j.status === "completed") return "待客戶驗收";
+    if (j.status === "active") return j.deposit_paid ? "施工中 / 訂金已收" : "施工中 / 訂金未收";
+    return j.deposit_paid ? "媒合中 / 訂金已收" : "待收訂金";
+  };
 
   const downloadText = (filename, text, mime = "text/plain;charset=utf-8") => {
     try {
@@ -3511,36 +3526,36 @@ const AdminView = ({ user }) => {
       const dep = Number(j.depositAmount) || calcDeposit(total);
       const tail = Number(j.tailAmount) || calcTail(total);
       return {
-        id: j.id,
-        status: j.status,
-        type: j.type,
-        title: j.title,
-        client: getUserName(j.clientId, j.clientName),
-        client_phone: getUserPhone(j.clientId),
-        engineer: getUserName(j.assignee),
-        engineer_phone: getUserPhone(j.assignee),
-        address: j.address,
-        scheduledDate: j.scheduledDate,
-        laborBudget: j.laborBudget,
-        materialBudget: j.materialBudget,
-        total,
-        deposit_paid: j.deposit_paid ? "Y" : "N",
-        depositAmount: dep,
-        tail_paid: j.tail_paid ? "Y" : "N",
-        tailAmount: tail,
-        created_at: j.created_at,
-        paidAt: j.paidAt || "",
-        photos: (j.photos || []).length,
-        materials: (j.materials || []).length,
-        messages: (j.messages || []).length,
-        acceptance_flag: j.acceptanceFlag ? "Y" : "N",
-        acceptance_note: j.acceptanceNote || "",
-        acceptance_at: j.acceptanceAt || "",
-        acceptance_by: getUserName(j.acceptanceBy),
-        audit_status: j.auditStatus || "",
-        audit_note: j.auditNote || "",
-        audit_at: j.auditAt || "",
-        audit_by: getUserName(j.auditBy),
+        工單編號: j.id,
+        狀態: JOB_STATUS_LABEL[j.status] || j.status || "",
+        類別: j.type,
+        標題: j.title,
+        客戶: getUserName(j.clientId, j.clientName),
+        客戶電話: getUserPhone(j.clientId),
+        工程師: getUserName(j.assignee),
+        工程師電話: getUserPhone(j.assignee),
+        地址: j.address,
+        預約時間: j.scheduledDate,
+        工資: j.laborBudget,
+        材料費: j.materialBudget,
+        總金額: total,
+        訂金已收: j.deposit_paid ? "是" : "否",
+        訂金金額: dep,
+        尾款已收: j.tail_paid ? "是" : "否",
+        尾款金額: tail,
+        建立時間: j.created_at,
+        結案時間: j.paidAt || "",
+        照片數量: (j.photos || []).length,
+        耗材數量: (j.materials || []).length,
+        訊息數量: (j.messages || []).length,
+        驗收異常: j.acceptanceFlag ? "是" : "否",
+        驗收備註: j.acceptanceNote || "",
+        驗收時間: j.acceptanceAt || "",
+        驗收人員: getUserName(j.acceptanceBy),
+        稽核狀態: auditLabel(j.auditStatus),
+        稽核備註: j.auditNote || "",
+        稽核時間: j.auditAt || "",
+        稽核人員: getUserName(j.auditBy),
       };
     });
 
@@ -3551,21 +3566,21 @@ const AdminView = ({ user }) => {
 
   const exportUsers = (list, format = "csv") => {
     const rows = list.map((u) => ({
-      id: u.id,
-      role: u.role,
-      status: u.status || "",
-      name: u.name || "",
-      email: u.email || "",
-      phone: u.phone || "",
-      address: u.address || "",
-      company_name: u.company_name || u.company || "",
-      tax_id: u.tax_id || u.taxId || u.taxid || "",
-      title: u.title || "",
-      experience: u.experience || "",
-      rating: u.rating ?? "",
-      jobs: u.jobs ?? "",
-      skills: Array.isArray(u.skills) ? u.skills.join("|") : "",
-      wallet: u.wallet ?? 0,
+      會員編號: u.id,
+      角色: roleLabel(u.role),
+      狀態: userStatusLabel(u.status),
+      姓名: u.name || "",
+      Email: u.email || "",
+      電話: u.phone || "",
+      地址: u.address || "",
+      公司名稱: u.company_name || u.company || "",
+      統一編號: u.tax_id || u.taxId || u.taxid || "",
+      職稱: u.title || "",
+      年資: u.experience || "",
+      評分: u.rating ?? "",
+      完成案件數: u.jobs ?? "",
+      技能: Array.isArray(u.skills) ? u.skills.join("|") : "",
+      錢包: u.wallet ?? 0,
     }));
 
     const stamp = new Date().toISOString().slice(0, 10);
@@ -3811,9 +3826,25 @@ const AdminView = ({ user }) => {
   };
 
   const approveWithdrawal = (w) => {
-    updateWithdrawal(w.id, { status: "approved", reviewedAt: new Date().toISOString(), reviewerId: user.id });
+    updateWithdrawal(w.id, {
+      status: "approved",
+      reviewedAt: new Date().toISOString(),
+      reviewerId: user.id,
+      approvedAt: new Date().toISOString(),
+      approvedBy: user.id,
+    });
     logAudit("approve_withdrawal", `id=${w.id} amount=${w.amount}`);
-    addToast("已通過提領申請", "success");
+    addToast("已核准提領，待匯款", "success");
+  };
+
+  const markWithdrawalPaid = (w) => {
+    updateWithdrawal(w.id, {
+      status: "paid",
+      paidAt: new Date().toISOString(),
+      paidBy: user.id,
+    });
+    logAudit("pay_withdrawal", `id=${w.id} amount=${w.amount}`);
+    addToast("已標記完成匯款", "success");
   };
 
   const rejectWithdrawal = (w) => {
@@ -4777,6 +4808,39 @@ const AdminView = ({ user }) => {
   };
   const pendingEngineers = useMemo(() => engineers.filter((u) => String(u.status || "") === "pending"), [engineers]);
   const pendingWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "pending"), [withdrawals]);
+  const approvedWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "approved"), [withdrawals]);
+  const paidWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "paid"), [withdrawals]);
+  const rejectedWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === "rejected"), [withdrawals]);
+
+  const paymentJobs = useMemo(() => jobs.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()), [jobs]);
+  const depositCollectedTotal = useMemo(() => {
+    return jobs.reduce((acc, j) => {
+      if (!j.deposit_paid) return acc;
+      const total = calcJobTotal(j);
+      return acc + (Number(j.depositAmount) || calcDeposit(total));
+    }, 0);
+  }, [jobs]);
+  const tailCollectedTotal = useMemo(() => {
+    return jobs.reduce((acc, j) => {
+      if (!(j.status === "closed" || j.tail_paid || j.paidAt)) return acc;
+      const total = calcJobTotal(j);
+      const dep = Number(j.depositAmount) || calcDeposit(total);
+      return acc + (Number(j.tailAmount) || (total - dep));
+    }, 0);
+  }, [jobs]);
+  const pendingTailTotal = useMemo(() => {
+    return jobs.reduce((acc, j) => {
+      if (j.status === "closed" || j.tail_paid) return acc;
+      const total = calcJobTotal(j);
+      const dep = Number(j.depositAmount) || calcDeposit(total);
+      return acc + (Number(j.tailAmount) || (total - dep));
+    }, 0);
+  }, [jobs]);
+  const withdrawalPendingTotal = useMemo(() => pendingWithdrawals.reduce((acc, w) => acc + (Number(w.amount) || 0), 0), [pendingWithdrawals]);
+  const withdrawalApprovedTotal = useMemo(() => approvedWithdrawals.reduce((acc, w) => acc + (Number(w.amount) || 0), 0), [approvedWithdrawals]);
+  const withdrawalPaidTotal = useMemo(() => paidWithdrawals.reduce((acc, w) => acc + (Number(w.amount) || 0), 0), [paidWithdrawals]);
+  const withdrawalRejectedTotal = useMemo(() => rejectedWithdrawals.reduce((acc, w) => acc + (Number(w.amount) || 0), 0), [rejectedWithdrawals]);
+  const platformNetCash = depositCollectedTotal + tailCollectedTotal - withdrawalPaidTotal;
 
   const ReportsPanel = () => {
     return (
@@ -4838,6 +4902,266 @@ const AdminView = ({ user }) => {
     );
   };
 
+  const FinancePanel = () => {
+    const paymentRows = paymentJobs.map((j) => {
+      const total = calcJobTotal(j);
+      const deposit = Number(j.depositAmount) || calcDeposit(total);
+      const tail = Number(j.tailAmount) || calcTail(total);
+      return {
+        案件編號: j.id,
+        狀態代碼: j.status,
+        案件標題: j.title || "-",
+        客戶: getUserName(j.clientId, j.clientName) || "-",
+        工程師: getUserName(j.assignee) || "-",
+        狀態: JOB_STATUS_LABEL[j.status] || j.status || "-",
+        付款進度: financePaymentLabel(j),
+        總金額: total,
+        已收訂金: j.deposit_paid ? deposit : 0,
+        訂金狀態: j.deposit_paid ? "已收" : "未收",
+        尾款金額: tail,
+        尾款狀態: j.tail_paid ? "已收" : "未收",
+        驗收狀態: j.acceptanceFlag ? "異常" : (j.status === "closed" ? "正常" : "未驗收"),
+        建立時間: j.created_at ? new Date(j.created_at).toLocaleString() : "-",
+        結案時間: j.paidAt ? new Date(j.paidAt).toLocaleString() : "-",
+      };
+    });
+
+    const withdrawalRows = withdrawals
+      .slice()
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .map((w) => {
+        const target = getUserById(w.userId);
+        return {
+          提領編號: w.id,
+          工程師: target?.name || w.userId || "-",
+          狀態: withdrawalStatusLabel(w.status),
+          金額: Number(w.amount) || 0,
+          方式: w.speed === "fast" ? "閃電提領" : "標準提領",
+          銀行名稱: w.bankName || target?.bankName || "-",
+          銀行代碼: w.bankCode || target?.bankCode || "-",
+          帳號: w.accountNo || target?.accountNo || "-",
+          戶名: w.accountName || target?.accountName || "-",
+          提領帳戶: w.withdrawAccount || target?.withdrawAccount || "-",
+          申請時間: w.createdAt ? new Date(w.createdAt).toLocaleString() : "-",
+          預計匯款: w.scheduledAt ? new Date(w.scheduledAt).toLocaleString() : "-",
+          審核時間: w.reviewedAt ? new Date(w.reviewedAt).toLocaleString() : "-",
+          匯款時間: w.paidAt ? new Date(w.paidAt).toLocaleString() : "-",
+          審核人: getUserName(w.reviewerId, w.reviewerId) || "-",
+          匯款人: getUserName(w.paidBy, w.paidBy) || "-",
+          備註: w.note || "",
+        };
+      });
+
+    const exportPayments = (format = "csv") => {
+      const stamp = new Date().toISOString().slice(0, 10);
+      if (format === "json") return downloadText(`finance_payments_${stamp}.json`, JSON.stringify(paymentRows, null, 2), "application/json;charset=utf-8");
+      return downloadText(`finance_payments_${stamp}.csv`, toCSV(paymentRows), "text/csv;charset=utf-8");
+    };
+
+    const exportWithdrawals = (format = "csv") => {
+      const stamp = new Date().toISOString().slice(0, 10);
+      if (format === "json") return downloadText(`finance_withdrawals_${stamp}.json`, JSON.stringify(withdrawalRows, null, 2), "application/json;charset=utf-8");
+      return downloadText(`finance_withdrawals_${stamp}.csv`, toCSV(withdrawalRows), "text/csv;charset=utf-8");
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="card-modern p-5">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">金流對帳</h2>
+              <div className="text-sm text-slate-500 mt-1">同時管理客戶付款、工程師提領、匯款與對帳報表</div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => exportPayments("csv")} className="btn btn-outline px-4 py-2 rounded-xl">匯出付款 CSV</button>
+              <button onClick={() => exportWithdrawals("csv")} className="btn btn-outline px-4 py-2 rounded-xl">匯出提領 CSV</button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 mt-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">客戶已收訂金</div>
+              <div className="text-2xl font-bold text-indigo-700 font-num">{formatCurrency(depositCollectedTotal)}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">客戶已收尾款</div>
+              <div className="text-2xl font-bold text-emerald-600 font-num">{formatCurrency(tailCollectedTotal)}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">工程師待提領</div>
+              <div className="text-2xl font-bold text-amber-600 font-num">{formatCurrency(withdrawalPendingTotal)}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">已核准待匯</div>
+              <div className="text-2xl font-bold text-slate-800 font-num">{formatCurrency(withdrawalApprovedTotal)}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="text-xs text-slate-500">已拒絕提領</div>
+              <div className="text-2xl font-bold text-rose-600 font-num">{formatCurrency(withdrawalRejectedTotal)}</div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 mt-4">
+            <button onClick={() => setFinanceTab("payments")} className={`px-4 py-2 rounded-xl font-bold text-sm border ${financeTab === "payments" ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}>客戶付款狀況</button>
+            <button onClick={() => setFinanceTab("withdrawals")} className={`px-4 py-2 rounded-xl font-bold text-sm border ${financeTab === "withdrawals" ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}>工程師提領狀況</button>
+          </div>
+        </div>
+
+        {financeTab === "payments" && (
+          <div className="card-modern p-6">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="font-bold text-slate-800">客戶付款總表</h3>
+              <div className="flex gap-2">
+                <button onClick={() => exportPayments("csv")} className="btn btn-outline px-4 py-2 rounded-xl">CSV</button>
+                <button onClick={() => exportPayments("json")} className="btn btn-outline px-4 py-2 rounded-xl">JSON</button>
+              </div>
+            </div>
+            <div className="overflow-x-auto no-scrollbar">
+              <table className="min-w-[1400px] w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 border-b sticky top-0">
+                  <tr>
+                    <th className="p-4">案件</th>
+                    <th className="p-4">客戶</th>
+                    <th className="p-4">工程師</th>
+                    <th className="p-4">狀態</th>
+                    <th className="p-4">付款進度</th>
+                    <th className="p-4">總金額</th>
+                    <th className="p-4">訂金</th>
+                    <th className="p-4">尾款</th>
+                    <th className="p-4">驗收</th>
+                    <th className="p-4">建立/結案</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentRows.map((row) => (
+                    <tr key={row.案件編號} className="border-b hover:bg-slate-50">
+                      <td className="p-4">
+                        <div className="font-bold text-slate-800">{row.案件標題}</div>
+                        <div className="text-xs text-slate-400 font-mono mt-1">{row.案件編號}</div>
+                      </td>
+                      <td className="p-4">{row.客戶}</td>
+                      <td className="p-4">{row.工程師}</td>
+                      <td className="p-4"><StatusBadge status={row.狀態代碼} /></td>
+                      <td className="p-4 text-slate-700">{row.付款進度}</td>
+                      <td className="p-4 font-bold text-indigo-700 font-num">{formatCurrency(row.總金額)}</td>
+                      <td className="p-4">
+                        <div className="font-bold text-emerald-600">{row.訂金狀態}</div>
+                        <div className="text-xs text-slate-400 font-num">{formatCurrency(row.已收訂金)}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-bold text-slate-700">{row.尾款狀態}</div>
+                        <div className="text-xs text-slate-400 font-num">{formatCurrency(row.尾款金額)}</div>
+                      </td>
+                      <td className="p-4 text-slate-700">{row.驗收狀態}</td>
+                      <td className="p-4 text-xs text-slate-500">
+                        <div>建立：{row.建立時間}</div>
+                        <div className="mt-1">結案：{row.結案時間}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {financeTab === "withdrawals" && (
+          <div className="card-modern p-6">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="font-bold text-slate-800">工程師提領總表</h3>
+              <div className="flex gap-2">
+                <button onClick={() => exportWithdrawals("csv")} className="btn btn-outline px-4 py-2 rounded-xl">CSV</button>
+                <button onClick={() => exportWithdrawals("json")} className="btn btn-outline px-4 py-2 rounded-xl">JSON</button>
+              </div>
+            </div>
+            <div className="overflow-x-auto no-scrollbar">
+              <table className="min-w-[1500px] w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 border-b sticky top-0">
+                  <tr>
+                    <th className="p-4">工程師</th>
+                    <th className="p-4">金額</th>
+                    <th className="p-4">狀態</th>
+                    <th className="p-4">方式</th>
+                    <th className="p-4">帳戶</th>
+                    <th className="p-4">申請/預計/審核/匯款</th>
+                    <th className="p-4">審核人</th>
+                    <th className="p-4">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {withdrawalRows.map((row) => {
+                    const target = withdrawals.find((w) => w.id === row.提領編號);
+                    return (
+                      <tr key={row.提領編號} className="border-b hover:bg-slate-50 align-top">
+                        <td className="p-4">
+                          <div className="font-bold text-slate-800">{row.工程師}</div>
+                          <div className="text-xs text-slate-400 font-mono mt-1">{row.提領編號}</div>
+                        </td>
+                        <td className="p-4 font-bold text-indigo-700 font-num">{formatCurrency(row.金額)}</td>
+                        <td className="p-4"><span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700">{row.狀態}</span></td>
+                        <td className="p-4 text-slate-700">{row.方式}</td>
+                        <td className="p-4 text-xs text-slate-600">
+                          <div>{row.銀行名稱}</div>
+                          <div>{row.銀行代碼}</div>
+                          <div>{row.帳號}</div>
+                          <div>{row.戶名}</div>
+                        </td>
+                        <td className="p-4 text-xs text-slate-500">
+                          <div>申請：{row.申請時間}</div>
+                          <div className="mt-1">預計匯款：{row.預計匯款}</div>
+                          <div className="mt-1">審核：{row.審核時間}</div>
+                          <div className="mt-1">匯款：{row.匯款時間}</div>
+                        </td>
+                        <td className="p-4 text-slate-700 text-xs">
+                          <div>審核：{row.審核人}</div>
+                          <div className="mt-1">匯款：{row.匯款人}</div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex flex-col gap-2">
+                            {target && target.status === "pending" && (
+                              <>
+                                <button onClick={() => approveWithdrawal(target)} className="btn btn-primary px-4 py-2 rounded-xl">核准待匯</button>
+                                <button onClick={() => rejectWithdrawal(target)} className="btn btn-danger px-4 py-2 rounded-xl">拒絕</button>
+                              </>
+                            )}
+                            {target && target.status === "approved" && (
+                              <button onClick={() => markWithdrawalPaid(target)} className="btn btn-primary px-4 py-2 rounded-xl">標記已匯款</button>
+                            )}
+                            {target && target.status === "paid" && (
+                              <div className="text-xs text-emerald-600 font-bold">已完成匯款</div>
+                            )}
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-1">預計匯款時間</label>
+                              <input
+                                type="datetime-local"
+                                className="input-modern py-1.5 text-xs"
+                                value={target?.scheduledAt ? new Date(target.scheduledAt).toISOString().slice(0, 16) : ""}
+                                onChange={(e) => target && updateWithdrawal(target.id, { scheduledAt: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-1">備註</label>
+                              <input
+                                className="input-modern py-1.5 text-xs"
+                                value={target?.note || ""}
+                                onChange={(e) => target && updateWithdrawal(target.id, { note: e.target.value })}
+                                placeholder="匯款備註"
+                              />
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row">
       {showReport && <DailyReport onClose={() => setShowReport(false)} />}
@@ -4865,6 +5189,7 @@ const AdminView = ({ user }) => {
             { id: "jobs", label: "全域工單", icon: "file-text" },
             { id: "users", label: "會員管理", icon: "users" },
             { id: "approvals", label: "審核中心", icon: "badge-check" },
+            { id: "finance", label: "金流對帳", icon: "wallet" },
             { id: "reports", label: "報表中心", icon: "bar-chart-3" },
             { id: "settings", label: "系統設定", icon: "settings" },
           ].map((i) => (
@@ -4923,6 +5248,32 @@ const AdminView = ({ user }) => {
               <div className="card-modern p-5">
                 <div className="text-xs text-slate-400">今日新增 / 完工</div>
                 <div className="text-2xl font-bold text-indigo-700 font-num">{createdToday.length} / {closedToday.length}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4 mt-4">
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">客戶已收訂金</div>
+                <div className="text-xl font-bold text-indigo-700 font-num">{formatCurrency(depositCollectedTotal)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">客戶已收尾款</div>
+                <div className="text-xl font-bold text-emerald-600 font-num">{formatCurrency(tailCollectedTotal)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">客戶待收尾款</div>
+                <div className="text-xl font-bold text-rose-600 font-num">{formatCurrency(pendingTailTotal)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">工程師待提領</div>
+                <div className="text-xl font-bold text-amber-600 font-num">{formatCurrency(withdrawalPendingTotal)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">已核准待匯</div>
+                <div className="text-xl font-bold text-slate-700 font-num">{formatCurrency(withdrawalApprovedTotal)}</div>
+              </div>
+              <div className="card-modern p-5">
+                <div className="text-xs text-slate-400">平台淨現金</div>
+                <div className="text-xl font-bold text-slate-900 font-num">{formatCurrency(platformNetCash)}</div>
               </div>
             </div>
             <div className="card-modern p-5 mt-4">
@@ -5356,7 +5707,7 @@ const AdminView = ({ user }) => {
             <div className="card-modern p-6 mt-6">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-bold text-slate-800">提領審核 ({pendingWithdrawals.length})</h3>
-                <div className="text-xs text-slate-400">按通過即視為完成匯款</div>
+                <div className="text-xs text-slate-400">核准後請到「金流對帳」標記已匯款</div>
               </div>
               {pendingWithdrawals.length === 0 ? (
                 <div className="text-sm text-slate-400">目前沒有待審核提領</div>
@@ -5412,6 +5763,7 @@ const AdminView = ({ user }) => {
           </>
         )}
 
+        {view === "finance" && <FinancePanel />}
         {view === "reports" && <ReportsPanel />}
 
         {view === "settings" && (
@@ -5530,9 +5882,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
