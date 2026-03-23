@@ -5723,6 +5723,9 @@ const AdminView = ({ user }) => {
     const jobRisk = getJobRiskState(j);
     const jobNextAction = getJobNextAction(j);
     const jobAgeDays = getJobAgeDays(j);
+    const [reviewNote, setReviewNote] = useState(j.auditNote || "");
+    const canApprove = j.auditStatus !== "approved";
+    const canNeedsFix = j.auditStatus !== "needs_fix" || String(reviewNote || "").trim() !== String(j.auditNote || "").trim();
 
     return (
       <div className="fixed inset-0 z-[220] bg-black/50 flex items-start justify-center p-4 py-6 overflow-y-auto">
@@ -5824,20 +5827,38 @@ const AdminView = ({ user }) => {
             </div>
           )}
 
-          <div className="p-6 border-t flex flex-col md:flex-row gap-3">
-            <button onClick={() => updateJobAudit(j, "approved", "管理端工單稽核通過")} className="flex-1 btn btn-primary">通過稽核</button>
-            <button
-              onClick={() => {
-                const note = window.prompt("請輸入稽核補件說明", j.auditNote || "");
-                if (note === null) return;
-                updateJobAudit(j, "needs_fix", note.trim());
-              }}
-              className="flex-1 btn btn-danger"
-            >
-              需補件
-            </button>
-            <button onClick={() => { setEditJob(j); onClose(); }} className="flex-1 btn btn-outline">編輯工單</button>
-            <button onClick={onClose} className="flex-1 btn btn-primary">關閉</button>
+          <div className="px-6 pb-2">
+            <div className="card-modern p-4">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase">審核操作</div>
+                  <div className="text-xs text-slate-500 mt-1">請先看補件內容與時間軸，再決定通過或退回。</div>
+                </div>
+                <div className="text-xs text-slate-400">目前狀態：{auditLabel(j.auditStatus)}</div>
+              </div>
+              <textarea
+                className="input-modern h-24 resize-none"
+                placeholder="稽核說明 / 補件要求"
+                value={reviewNote}
+                onChange={(e) => setReviewNote(e.target.value)}
+              />
+              <div className="mt-3 flex flex-col md:flex-row gap-3">
+                <button
+                  onClick={() => updateJobAudit(j, "approved", String(reviewNote || "").trim() || "管理端工單稽核通過")}
+                  className={`flex-1 btn btn-primary ${canApprove ? "" : "opacity-60 pointer-events-none"}`}
+                >
+                  通過稽核
+                </button>
+                <button
+                  onClick={() => updateJobAudit(j, "needs_fix", String(reviewNote || "").trim() || "請依補件內容修正")}
+                  className={`flex-1 btn btn-danger ${canNeedsFix ? "" : "opacity-60 pointer-events-none"}`}
+                >
+                  需補件
+                </button>
+                <button onClick={() => { setEditJob(j); onClose(); }} className="flex-1 btn btn-outline">編輯工單</button>
+                <button onClick={onClose} className="flex-1 btn btn-primary">關閉</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
