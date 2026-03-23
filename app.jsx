@@ -2431,6 +2431,76 @@ const total = calcJobTotal(job);
     setPhotoMeta((prev) => prev.map((m, i) => (i === idx ? { ...m, ...patch } : m)));
   };
 
+  const handleSupplementPhoto = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const remainingSlots = Math.max(0, 4 - supplementPhotos.length);
+    if (remainingSlots === 0) {
+      addToast("補件照片最多 4 張，請先刪除舊照片再上傳", "error");
+      e.target.value = "";
+      return;
+    }
+
+    for (const file of files.slice(0, remainingSlots)) {
+      try {
+        if ((Number(file.size) || 0) > 8 * 1024 * 1024) {
+          addToast("圖片過大，請選擇 8MB 以下檔案", "error");
+          continue;
+        }
+        const imageDataUrl = await compressImageFile(file);
+        setSupplementPhotos((prev) => [...prev, imageDataUrl]);
+        setSupplementPhotoMeta((prev) => [...prev, { note: "", mark: "" }]);
+      } catch (error) {
+        addToast("補件照片處理失敗，請改用較小檔案", "error");
+      }
+    }
+
+    e.target.value = "";
+  };
+
+  const removeSupplementPhoto = (idx) => {
+    setSupplementPhotos((prev) => prev.filter((_, i) => i !== idx));
+    setSupplementPhotoMeta((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const updateSupplementPhotoMeta = (idx, patch) => {
+    setSupplementPhotoMeta((prev) => prev.map((m, i) => (i === idx ? { ...m, ...patch } : m)));
+  };
+
+  const submitSupplement = () => {
+    try {
+      const note = String(supplementNote || "").trim();
+      const hasPhotos = supplementPhotos.length > 0;
+      if (!note && !hasPhotos) {
+        addToast("請至少填寫補件說明或上傳補件照片", "error");
+        return;
+      }
+      if (supplementPhotoMeta.length !== supplementPhotos.length) {
+        addToast("補件照片說明/點位數量不一致，請檢查", "error");
+        return;
+      }
+
+      const cleanedPhotos = supplementPhotos.slice(0, MAX_JOB_PHOTOS);
+      const cleanedMeta = sanitizePhotoMeta(cleanedPhotos, supplementPhotoMeta);
+      const nextSupplementAt = new Date().toISOString();
+
+      setSupplementAt(nextSupplementAt);
+      onUpdate({
+        ...job,
+        supplementNote: note,
+        supplementAt: nextSupplementAt,
+        supplementBy: user?.id || null,
+        supplementPhotos: cleanedPhotos,
+        supplementPhotoMeta: cleanedMeta,
+        auditStatus: "unreviewed",
+      });
+      addToast("補件回報已送出，等待管理端複查", "success");
+    } catch (error) {
+      console.error(error);
+      addToast("補件送出失敗，請重新整理後再試", "error");
+    }
+  };
+
   const materialSum = materials.reduce((acc, m) => acc + (Number(m.price) || 0) * (Number(m.qty) || 0), 0);
 
   const submit = () => {
