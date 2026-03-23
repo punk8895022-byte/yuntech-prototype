@@ -235,6 +235,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -2900,6 +2901,7 @@ const ClientView = ({ user }) => {
   const { addToast } = useToast();
   const [showInbox, setShowInbox] = useState(false);
   const [chatJob, setChatJob] = useState(null);
+  const [showWallet, setShowWallet] = useState(false);
   const chatPeer = chatJob ? users.find((u) => u.id === chatJob.assignee) : null;
 
   const [showProfile, setShowProfile] = useState(false);
@@ -6820,9 +6822,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
