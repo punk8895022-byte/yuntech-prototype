@@ -234,6 +234,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -435,6 +436,10 @@ const DB_DEFAULTS = {
 const normalizeJob = (job) => {
   const laborBudget = Number.parseInt(job.laborBudget ?? job.budget_labor ?? job.labor ?? 0, 10) || 0;
   const materialBudget = Number.parseInt(job.materialBudget ?? job.budget_material ?? job.material ?? 0, 10) || 0;
+  const photos = Array.isArray(job.photos)
+    ? job.photos.map((p) => trimDataUrl(p)).filter(Boolean).slice(0, MAX_JOB_PHOTOS)
+    : [];
+  const photoMeta = sanitizePhotoMeta(photos, job.photoMeta);
 
   return {
     id: job.id ?? `J-${Date.now()}`,
@@ -462,10 +467,10 @@ const normalizeJob = (job) => {
     materialSum: Number(job.materialSum ?? 0) || 0,
     materials: Array.isArray(job.materials) ? job.materials : [],
     messages: Array.isArray(job.messages) ? job.messages : [],
-    customItems: Array.isArray(job.customItems) ? job.customItems : [],
-    photos: Array.isArray(job.photos) ? job.photos : [],
-    photoMeta: Array.isArray(job.photoMeta) ? job.photoMeta : [],
-    signature: typeof job.signature === "string" ? job.signature : null,
+    customItems: Array.isArray(job.customItems) ? job.customItems.slice(0, 20) : [],
+    photos,
+    photoMeta,
+    signature: trimDataUrl(job.signature, MAX_DATA_URL_LENGTH),
     acceptanceNote: job.acceptanceNote ?? "",
     acceptanceFlag: Boolean(job.acceptanceFlag ?? false),
     acceptanceAt: job.acceptanceAt ?? null,
@@ -489,6 +494,70 @@ const calcDeposit = (total) => Math.round((Number(total) || 0) * 0.3);
 const calcTail = (total) => (Number(total) || 0) - calcDeposit(total);
 
 const isProJob = (job) => calcJobTotal(job) >= 20000;
+
+const MAX_DATA_URL_LENGTH = 160000;
+const MAX_JOB_PHOTOS = 4;
+const MAX_USER_PHOTO_LENGTH = 140000;
+
+const trimDataUrl = (value, maxLength = MAX_DATA_URL_LENGTH) => {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return null;
+  if (!text.startsWith("data:image/")) return null;
+  if (text.length > maxLength) return null;
+  return text;
+};
+
+const sanitizePhotoMeta = (photos, meta) => {
+  const photoList = Array.isArray(photos) ? photos : [];
+  const metaList = Array.isArray(meta) ? meta : [];
+  return photoList.map((_, idx) => {
+    const item = metaList[idx] || {};
+    return {
+      note: String(item.note || "").slice(0, 120),
+      mark: String(item.mark || "").slice(0, 120),
+    };
+  });
+};
+
+const normalizeUser = (user) => {
+  const role = String(user?.role || "").trim();
+  const skills = Array.isArray(user?.skills)
+    ? user.skills.map((skill) => String(skill || "").trim()).filter(Boolean).slice(0, 12)
+    : [];
+
+  return {
+    ...user,
+    id: user?.id ?? `U-${Date.now()}`,
+    name: String(user?.name || "").trim(),
+    email: String(user?.email || "").trim(),
+    password: String(user?.password || ""),
+    role: role || "client_personal",
+    phone: String(user?.phone || "").trim(),
+    address: String(user?.address || "").trim(),
+    company: String(user?.company || user?.company_name || "").trim(),
+    company_name: String(user?.company_name || user?.company || "").trim(),
+    taxId: String(user?.taxId || user?.tax_id || "").trim(),
+    tax_id: String(user?.tax_id || user?.taxId || "").trim(),
+    experience: String(user?.experience || "").trim(),
+    title: String(user?.title || "").trim(),
+    licenseNo: String(user?.licenseNo || user?.license || "").trim(),
+    license: String(user?.license || user?.licenseNo || "").trim(),
+    emergencyName: String(user?.emergencyName || "").trim(),
+    emergencyPhone: String(user?.emergencyPhone || "").trim(),
+    withdrawAccount: String(user?.withdrawAccount || "").trim(),
+    bankName: String(user?.bankName || "").trim(),
+    bankCode: String(user?.bankCode || "").trim(),
+    accountNo: String(user?.accountNo || "").trim(),
+    accountName: String(user?.accountName || "").trim(),
+    bankBookPhoto: trimDataUrl(user?.bankBookPhoto, MAX_USER_PHOTO_LENGTH),
+    avatar: String(user?.avatar || "").trim() || (String(user?.name || "").trim() ? String(user.name).trim()[0] : "U"),
+    status: String(user?.status || (role === "engineer" ? "pending" : "active")),
+    wallet: Number(user?.wallet) || 0,
+    rating: Number(user?.rating) || (role === "engineer" ? 5 : 0),
+    jobs: Number(user?.jobs) || 0,
+    skills,
+  };
+};
 
 const JOB_STATUS_FLOW = [
   { id: "open", label: "媒合中", percent: 25 },
@@ -693,9 +762,10 @@ const AppContext = createContext();
 const AppProvider = ({ children }) => {
   const [users, setUsers] = useState(() => {
     try {
-      return safeStorageGet("cl_users_v101", DB_DEFAULTS.users) || DB_DEFAULTS.users;
+      const loaded = safeStorageGet("cl_users_v101", DB_DEFAULTS.users) || DB_DEFAULTS.users;
+      return Array.isArray(loaded) ? loaded.map(normalizeUser) : DB_DEFAULTS.users.map(normalizeUser);
     } catch {
-      return DB_DEFAULTS.users;
+      return DB_DEFAULTS.users.map(normalizeUser);
     }
   });
 
@@ -719,7 +789,7 @@ const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    safeStorageSet("cl_users_v101", JSON.stringify(users));
+    safeStorageSet("cl_users_v101", JSON.stringify(users.map(normalizeUser)));
   }, [users]);
 
   useEffect(() => {
@@ -763,8 +833,9 @@ const AppProvider = ({ children }) => {
   const addJob = (jobData) => setJobs((prev) => [normalizeJob(jobData), ...prev]);
   const updateJob = (updatedJob) => setJobs((prev) => prev.map((j) => (j.id === updatedJob.id ? normalizeJob(updatedJob) : j)));
   const updateUser = (updatedUser) => {
-    setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
-    setUser((prev) => (prev && prev.id === updatedUser.id ? updatedUser : prev));
+    const next = normalizeUser(updatedUser);
+    setUsers((prev) => prev.map((u) => (u.id === next.id ? next : u)));
+    setUser((prev) => (prev && prev.id === next.id ? next : prev));
   };
 
   const requestWithdrawal = ({ userId, amount, speed, accountInfo }) => {
@@ -781,7 +852,7 @@ const AppProvider = ({ children }) => {
       accountNo: accountInfo?.accountNo || "",
       accountName: accountInfo?.accountName || "",
       withdrawAccount: accountInfo?.withdrawAccount || "",
-      bankBookPhoto: accountInfo?.bankBookPhoto || "",
+      bankBookPhoto: trimDataUrl(accountInfo?.bankBookPhoto, MAX_USER_PHOTO_LENGTH),
       note: "",
       reviewedAt: null,
       reviewerId: null,
@@ -794,8 +865,9 @@ const AppProvider = ({ children }) => {
     setWithdrawals((prev) => prev.map((w) => (w.id === id ? { ...w, ...patch } : w)));
   };
   const registerUser = (newUser) => {
-    setUsers((prev) => [...prev, newUser]);
-    setUser(newUser);
+    const next = normalizeUser(newUser);
+    setUsers((prev) => [...prev, next]);
+    setUser(next);
   };
 
   const resetData = () => {
@@ -4448,16 +4520,16 @@ const AdminView = ({ user }) => {
           return;
         }
 
-        if (mode === "replace") {
-          setUsers(nextUsers);
+      if (mode === "replace") {
+          setUsers(nextUsers.map(normalizeUser));
           setJobs(nextJobs.map(normalizeJob));
           if (nextAudit) setAudit(nextAudit);
           if (nextWithdrawals) setWithdrawals(nextWithdrawals);
         } else {
           setUsers((prev) => {
             const map = new Map(prev.map((u) => [u.id, u]));
-            nextUsers.forEach((u) => map.set(u.id, { ...map.get(u.id), ...u }));
-            return Array.from(map.values());
+            nextUsers.forEach((u) => map.set(u.id, normalizeUser({ ...map.get(u.id), ...u })));
+            return Array.from(map.values()).map(normalizeUser);
           });
           setJobs((prev) => {
             const map = new Map(prev.map((j) => [j.id, j]));
@@ -4578,7 +4650,7 @@ const AdminView = ({ user }) => {
         u.bankBookPhoto = form.bankBookPhoto;
       }
 
-      setUsers((prev) => [...prev, u]);
+      setUsers((prev) => [...prev, normalizeUser(u)]);
       logAudit("create_user", `${u.role} ${u.id}`);
       addToast("已新增會員", "success");
       onClose();
@@ -4869,7 +4941,7 @@ const AdminView = ({ user }) => {
     const isClientBiz = form.role === "client_business";
 
     const save = () => {
-      setUsers((prev) => prev.map((u) => (u.id === data.id ? { ...u, ...form } : u)));
+      setUsers((prev) => prev.map((u) => (u.id === data.id ? normalizeUser({ ...u, ...form }) : u)));
       logAudit("edit_user", data.id);
       addToast("會員資料已更新", "success");
       onClose();
@@ -6747,9 +6819,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
