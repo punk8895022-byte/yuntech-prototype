@@ -252,6 +252,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -665,6 +666,13 @@ const roleGroup = (role) => {
   if (value === "engineer" || value === "tech") return "engineer";
   if (value === "admin") return "admin";
   return "other";
+};
+
+const roleLabel = (role) => {
+  if (roleGroup(role) === "client") return "客戶";
+  if (roleGroup(role) === "engineer") return "工程師";
+  if (roleGroup(role) === "admin") return "管理";
+  return role || "-";
 };
 
 const safeStorageSet = (key, value) => {
@@ -7137,9 +7145,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
