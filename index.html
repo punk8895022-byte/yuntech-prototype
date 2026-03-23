@@ -214,6 +214,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -248,6 +249,8 @@ const PROJECT_CATEGORIES = [
       { id: "w1", name: "電話總機分機", unit: "式", price: 1500, labor: 1000 },
       { id: "w2", name: "對講機安裝", unit: "式", price: 3000, labor: 1500 },
       { id: "w3", name: "廣播喇叭", unit: "只", price: 2500, labor: 1200 },
+      { id: "w4", name: "門鈴/蜂鳴器", unit: "組", price: 1800, labor: 900 },
+      { id: "w5", name: "管線整理", unit: "式", price: 1200, labor: 1200 },
     ],
   },
   {
@@ -260,6 +263,8 @@ const PROJECT_CATEGORIES = [
       { id: "n2", name: "Wi-Fi AP 安裝", unit: "台", price: 4500, labor: 1500 },
       { id: "n3", name: "網路機櫃整線", unit: "式", price: 5000, labor: 5000 },
       { id: "n4", name: "路由器設定", unit: "台", price: 2000, labor: 2000 },
+      { id: "n5", name: "光纖熔接/測試", unit: "點", price: 3500, labor: 2000 },
+      { id: "n6", name: "交換器安裝", unit: "台", price: 2800, labor: 1200 },
     ],
   },
   {
@@ -272,6 +277,8 @@ const PROJECT_CATEGORIES = [
       { id: "c2", name: "半球型攝影機 (含線)", unit: "支", price: 3500, labor: 1500 },
       { id: "c3", name: "4路 NVR 主機", unit: "台", price: 4500, labor: 1000 },
       { id: "c4", name: "8路 NVR 主機", unit: "台", price: 7500, labor: 1000 },
+      { id: "c5", name: "監視器調角/測試", unit: "支", price: 1200, labor: 800 },
+      { id: "c6", name: "硬碟安裝/格式化", unit: "台", price: 1800, labor: 800 },
     ],
   },
   {
@@ -284,10 +291,32 @@ const PROJECT_CATEGORIES = [
       { id: "a2", name: "陽極鎖安裝", unit: "組", price: 4500, labor: 2500 },
       { id: "a3", name: "感應讀卡機", unit: "台", price: 3500, labor: 1500 },
       { id: "a4", name: "開門按鈕", unit: "顆", price: 800, labor: 500 },
+      { id: "a5", name: "門禁主機設定", unit: "台", price: 2800, labor: 1800 },
+      { id: "a6", name: "刷卡權限建置", unit: "式", price: 2500, labor: 1500 },
     ],
   },
-  { id: "info", label: "資訊工程", icon: "server", color: "indigo", subItems: [{ id: "i1", name: "伺服器上架", unit: "式", price: 3000, labor: 3000 }] },
-  { id: "pc", label: "電腦維修", icon: "monitor", color: "slate", subItems: [{ id: "p1", name: "系統重灌", unit: "台", price: 800, labor: 800 }] },
+  {
+    id: "info",
+    label: "資訊工程",
+    icon: "server",
+    color: "indigo",
+    subItems: [
+      { id: "i1", name: "伺服器上架", unit: "式", price: 3000, labor: 3000 },
+      { id: "i2", name: "NAS 儲存設定", unit: "台", price: 2800, labor: 1800 },
+      { id: "i3", name: "備份排程建置", unit: "式", price: 2400, labor: 1600 },
+    ],
+  },
+  {
+    id: "pc",
+    label: "電腦維修",
+    icon: "monitor",
+    color: "slate",
+    subItems: [
+      { id: "p1", name: "系統重灌", unit: "台", price: 800, labor: 800 },
+      { id: "p2", name: "資料備份/移轉", unit: "台", price: 1500, labor: 1500 },
+      { id: "p3", name: "病毒清除/優化", unit: "台", price: 1200, labor: 1200 },
+    ],
+  },
 ];
 
 const SUPPLIES_DB = [
@@ -448,6 +477,13 @@ const JOB_STATUS_FLOW = [
   { id: "completed", label: "待驗收", percent: 75 },
   { id: "closed", label: "已結案", percent: 100 },
 ];
+
+const JOB_STATUS_LABEL = {
+  open: "媒合中",
+  active: "施工中",
+  completed: "待驗收",
+  closed: "已完成",
+};
 
 const USER_STATUS_LABEL = {
   active: "啟用中",
@@ -1657,7 +1693,7 @@ const ClientCreateJob = ({ onClose }) => {
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="text-xs font-bold text-slate-500 mb-2 block">工程類別</label>
-            <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
               {PROJECT_CATEGORIES.map((cat) => (
                 <button key={cat.id} onClick={() => setForm({ ...form, type: cat.label, items: {} })} className={`category-btn ${form.type === cat.label ? "active" : "inactive"}`}>
                   <Icon name={cat.icon} size={24} className="mb-1" /> <span className="text-[10px] font-bold">{cat.label}</span>
@@ -2580,9 +2616,14 @@ const ClientView = ({ user }) => {
   const [showProfile, setShowProfile] = useState(false);
   const [nav, setNav] = useState("jobs");
   const [infoTab, setInfoTab] = useState("contact");
+  const [jobTab, setJobTab] = useState("all");
 
 
   const myJobs = jobs.filter((j) => j.clientId === user.id);
+  const visibleJobs = useMemo(() => {
+    if (jobTab === "all") return myJobs;
+    return myJobs.filter((j) => j.status === jobTab);
+  }, [jobTab, myJobs]);
   const paymentRecords = useMemo(() => {
     const records = [];
     myJobs.forEach((j) => {
@@ -2609,6 +2650,14 @@ const ClientView = ({ user }) => {
     return records.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   }, [myJobs]);
   const paidTotal = paymentRecords.reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
+
+  const jobTabs = [
+    { id: "all", label: "全部", count: myJobs.length },
+    { id: "open", label: "媒合中", count: myJobs.filter((j) => j.status === "open").length },
+    { id: "active", label: "施工中", count: myJobs.filter((j) => j.status === "active").length },
+    { id: "completed", label: "待驗收", count: myJobs.filter((j) => j.status === "completed").length },
+    { id: "closed", label: "已完成", count: myJobs.filter((j) => j.status === "closed").length },
+  ];
 
   return (
     <div className="min-h-screen pb-32">
@@ -2656,6 +2705,7 @@ const ClientView = ({ user }) => {
       )}
 
       {showProfile && <ProfileModal user={user} onClose={() => { setShowProfile(false); setNav("jobs"); }} />}
+      <div className="mx-auto max-w-3xl px-4 pt-4">
       <div className="p-6 pt-12 pb-20 bg-indigo-600 text-white rounded-b-[2.5rem] shadow-xl shadow-indigo-200 mb-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-12 opacity-10"><Icon name="zap" size={120} /></div>
         <div className="flex justify-between items-center mb-6 relative z-10">
@@ -2671,18 +2721,21 @@ const ClientView = ({ user }) => {
         </button>
       </div>
 
-      <div className="px-6 space-y-4">
+      <div className="mx-auto max-w-3xl px-4 space-y-4">
         <div className="card-modern p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="font-bold text-slate-800">我的資訊</div>
             <button onClick={() => setShowProfile(true)} className="text-xs font-bold text-indigo-600 hover:underline">編輯</button>
           </div>
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
             <button onClick={() => setInfoTab("contact")} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${infoTab === "contact" ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}>
               聯絡資訊
             </button>
             <button onClick={() => setInfoTab("company")} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${infoTab === "company" ? "bg-slate-50 text-slate-700 border-slate-200" : "bg-white text-slate-600 border-slate-200"}`}>
               公司資訊
+            </button>
+            <button onClick={() => setInfoTab("finance")} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${infoTab === "finance" ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}>
+              帳務摘要
             </button>
             <button onClick={() => setInfoTab("cash")} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${infoTab === "cash" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-white text-slate-600 border-slate-200"}`}>
               付款紀錄
@@ -2703,6 +2756,14 @@ const ClientView = ({ user }) => {
               <div><span className="text-xs text-slate-400 block">統一編號</span>{user.taxId || user.tax_id || "-"}</div>
               <div><span className="text-xs text-slate-400 block">公司電話</span>{user.companyPhone || "-"}</div>
               <div><span className="text-xs text-slate-400 block">公司地址</span>{user.companyAddress || "-"}</div>
+            </div>
+          )}
+          {infoTab === "finance" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600">
+              <div><span className="text-xs text-slate-400 block">累計案件數</span>{myJobs.length}</div>
+              <div><span className="text-xs text-slate-400 block">已結案</span>{myJobs.filter((j) => j.status === "closed").length}</div>
+              <div><span className="text-xs text-slate-400 block">已付款</span>{formatCurrency(paidTotal)}</div>
+              <div><span className="text-xs text-slate-400 block">未完成案件總額</span>{formatCurrency(myJobs.filter((j) => j.status !== "closed").reduce((acc, j) => acc + calcJobTotal(j), 0))}</div>
             </div>
           )}
           {infoTab === "cash" && (
@@ -2727,8 +2788,22 @@ const ClientView = ({ user }) => {
           )}
         </div>
 
-        <h3 className="font-bold text-slate-800">進行中案件</h3>
-        {myJobs.map((j) => (
+        <div className="card-modern p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-slate-800">案件分類</h3>
+            <span className="text-xs text-slate-400">依狀態快速切換</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            {jobTabs.map((t) => (
+              <button key={t.id} onClick={() => setJobTab(t.id)} className={`px-3 py-1.5 rounded-xl border text-xs font-bold whitespace-nowrap ${jobTab === t.id ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}>
+                {t.label} {t.count}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <h3 className="font-bold text-slate-800">{JOB_STATUS_LABEL[jobTab] ? `${JOB_STATUS_LABEL[jobTab]}案件` : "全部案件"}</h3>
+        {visibleJobs.map((j) => (
           <div key={j.id} onClick={() => setSelectedJob(j)} className="card-modern p-5 cursor-pointer">
             <div className="flex justify-between mb-2"><span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold">{getStatusProgress(j.status).label}</span></div>
             <h4 className="font-bold text-lg text-slate-800 mb-1">{j.title}</h4>
@@ -2746,7 +2821,7 @@ const ClientView = ({ user }) => {
             )}
           </div>
         ))}
-        {myJobs.length === 0 && <div className="text-sm text-slate-400">目前沒有案件，點上方按鈕可以快速發案。</div>}
+        {visibleJobs.length === 0 && <div className="text-sm text-slate-400">目前沒有符合條件的案件。</div>}
       </div>
       <BottomNav
         active={nav}
@@ -2778,8 +2853,8 @@ const ClientView = ({ user }) => {
           { id: "me", label: "我的", icon: "user" },
         ]}
       />
-
-</div>
+      </div>
+    </div>
   );
 };
 
@@ -3057,6 +3132,7 @@ const TechView = ({ user }) => {
   const { jobs, setJobs, users, withdrawals, logout, updateUser, requestWithdrawal } = useApp();
   const [selectedJob, setSelectedJob] = useState(null);
   const [tab, setTab] = useState("market");
+  const [statusTab, setStatusTab] = useState("all");
   const [showWallet, setShowWallet] = useState(false);
   const { addToast } = useToast();
   const [showProfile, setShowProfile] = useState(false);
@@ -3069,8 +3145,18 @@ const TechView = ({ user }) => {
 
   const marketJobs = jobs.filter((j) => j.status === "open");
   const myJobs = jobs.filter((j) => j.assignee === user.id);
-
-  const list = tab === "market" ? marketJobs : myJobs;
+  const baseJobs = tab === "market" ? marketJobs : myJobs;
+  const visibleJobs = useMemo(() => {
+    if (statusTab === "all") return baseJobs;
+    return baseJobs.filter((j) => j.status === statusTab);
+  }, [baseJobs, statusTab]);
+  const statusTabs = [
+    { id: "all", label: "全部", count: baseJobs.length },
+    { id: "open", label: "媒合中", count: baseJobs.filter((j) => j.status === "open").length },
+    { id: "active", label: "施工中", count: baseJobs.filter((j) => j.status === "active").length },
+    { id: "completed", label: "待驗收", count: baseJobs.filter((j) => j.status === "completed").length },
+    { id: "closed", label: "已完成", count: baseJobs.filter((j) => j.status === "closed").length },
+  ];
 
   const pendingTail = jobs
     .filter((j) => j.assignee === user.id && j.status === "completed")
@@ -3150,7 +3236,8 @@ const TechView = ({ user }) => {
       )}
 
       {showProfile && <ProfileModal user={user} onClose={() => { setShowProfile(false); setNav("jobs"); }} />}
-      <div className="p-6 sticky top-0 bg-white/80 backdrop-blur-md z-10 border-b border-slate-100 flex justify-between items-center">
+      <div className="mx-auto max-w-3xl px-4">
+      <div className="p-6 sticky top-0 bg-white/80 backdrop-blur-md z-10 border-b border-slate-100 flex justify-between items-center rounded-b-3xl shadow-sm">
         <div>
           <h2 className="text-xl font-bold text-slate-800">{tab === "market" ? "接案大廳" : "我的任務"}</h2>
           <p className="text-xs text-slate-400">待媒合 {marketJobs.length} | 我的 {myJobs.length}</p>
@@ -3164,7 +3251,7 @@ const TechView = ({ user }) => {
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-4 space-y-4">
         <div className="grid grid-cols-2 gap-3 mb-4">
           <button onClick={() => setTab("market")} className={`p-3 rounded-2xl font-bold text-sm border transition ${tab === "market" ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
             待媒合
@@ -3222,8 +3309,26 @@ const TechView = ({ user }) => {
           )}
         </div>
 
+        <div className="card-modern p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-slate-800">案件狀態</h3>
+            <span className="text-xs text-slate-400">依狀態分類顯示</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            {statusTabs.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setStatusTab(s.id)}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold whitespace-nowrap ${statusTab === s.id ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"}`}
+              >
+                {s.label} {s.count}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="space-y-4">
-          {list.map((j) => {
+          {visibleJobs.map((j) => {
             const total = calcJobTotal(j);
             const pro = isProJob(j);
             const dist = pseudoDistanceKm(j.id);
@@ -3255,9 +3360,9 @@ const TechView = ({ user }) => {
             );
           })}
 
-          {list.length === 0 && (
+          {visibleJobs.length === 0 && (
             <div className="text-sm text-slate-400 bg-white border border-slate-200 rounded-2xl p-6 text-center">
-              {tab === "market" ? "目前沒有待媒合案件" : "你目前沒有進行中的任務"}
+              {tab === "market" ? "目前沒有待媒合案件" : "你目前沒有符合條件的任務"}
             </div>
           )}
         </div>
@@ -3292,8 +3397,8 @@ const TechView = ({ user }) => {
           { id: "me", label: "我的", icon: "user" },
         ]}
       />
-
-</div>
+      </div>
+    </div>
   );
 };
 
@@ -5424,9 +5529,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
