@@ -216,6 +216,7 @@
 
 
 
+
 const { useState, useEffect, useMemo, useContext, createContext } = React;
 
 // --- [0. Core: Icon System] ---
@@ -3136,7 +3137,6 @@ const ProfileModal = ({ user, onClose }) => {
 };
 
 const TechView = ({ user }) => {
-  
   const { jobs, setJobs, users, withdrawals, logout, updateUser, requestWithdrawal } = useApp();
   const [selectedJob, setSelectedJob] = useState(null);
   const [tab, setTab] = useState("market");
@@ -3144,11 +3144,12 @@ const TechView = ({ user }) => {
   const [showWallet, setShowWallet] = useState(false);
   const { addToast } = useToast();
   const [showProfile, setShowProfile] = useState(false);
+  const [infoTab, setInfoTab] = useState("contact");
   const [showInbox, setShowInbox] = useState(false);
   const [chatJob, setChatJob] = useState(null);
   const chatPeer = chatJob ? users.find((u) => u.id === chatJob.clientId) : null;
   const [nav, setNav] = useState("jobs");
-  const [infoTab, setInfoTab] = useState("contact");
+
 
 
   const marketJobs = jobs.filter((j) => j.status === "open");
@@ -5883,9 +5884,11 @@ root.render(
 
 
 
+
 </script>
   </body>
 </html>
+
 
 
 
