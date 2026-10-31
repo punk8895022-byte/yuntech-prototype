@@ -10,7 +10,7 @@
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="%236366f1"/><text x="50%" y="56%" font-size="34" text-anchor="middle" fill="white" font-family="Arial" font-weight="700">雲</text></svg>' />
 
     <!-- 1. 核心庫 -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script>window.__CLOUDLINK_M1B_STAGING_ENABLED__=(["localhost","127.0.0.1"].includes(location.hostname) && location.pathname==="/legacy-react");</script><script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -1945,6 +1945,7 @@ const ClientCreateJob = ({ onClose }) => {
     items: {},
     customItems: [],
   });
+  const [stagingToken, setStagingToken] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
 
   const { addToast } = useToast();
@@ -2027,56 +2028,35 @@ const ClientCreateJob = ({ onClose }) => {
     }));
   };
 
-  const handleSubmit = () => {
-    if (!form.title || !form.type || !form.address) {
-      addToast("請填寫完整資訊", "error");
-      return;
+  const handleSubmit = async () => {
+    // M1b isolated feature branch: never run the old demo-wallet payment flow.
+    if (window.__CLOUDLINK_M1B_STAGING_ENABLED__ !== true ||
+        !["localhost","127.0.0.1"].includes(window.location.hostname)) {
+      addToast("舊版模擬付款已停用；請由本機 M1b 隔離入口測試", "error"); return;
     }
-
-    const labor = Number.parseInt(form.labor, 10) || 0;
-    const material = Number.parseInt(form.material, 10) || 0;
-    const total = labor + material;
-
-    if (total <= 0) {
-      addToast("請設定預算金額", "error");
-      return;
+    const category = PROJECT_CATEGORIES.find(item => item.label === form.type);
+    if (!category || !["net","cctv","access"].includes(category.id)) {
+      addToast("這個工程類別尚未完成後端相容驗證", "error"); return;
     }
-
-    const deposit = calcDeposit(total);
-    const tail = total - deposit;
-
-    const wallet = Number(user.wallet) || 0;
-    if (wallet < deposit) {
-      addToast(`錢包餘額不足，訂金需要 ${formatCurrency(deposit)}`, "error");
-      return;
+    const region = String(form.address || "").trim();
+    if (!/^[\u4e00-\u9fff]{2,5}[縣市]$/.test(region)) {
+      addToast("隔離測試僅可填縣市，例如台南市；不可輸入實際地址", "error"); return;
     }
-
-    updateUser({ ...user, wallet: wallet - deposit });
-
-    addJob({
-      id: `J-${Date.now()}`,
-      title: form.title,
-      type: form.type,
-      address: form.address,
-      desc: form.desc,
-      scheduledDate: form.date,
-      status: "open",
-      clientId: user.id,
-      clientName: user.name,
-      laborBudget: labor,
-      materialBudget: material,
-      deposit_paid: true,
-      depositAmount: deposit,
-      tailAmount: tail,
-      created_at: new Date().toISOString(),
-      customItems: form.customItems || [],
-      materials: [],
-      photos: [],
-      signature: null,
-    });
-
-    addToast(`訂金已支付 ${formatCurrency(deposit)}，已成功發案`, "success");
-    onClose();
+    const description = [form.title, form.desc].filter(Boolean).join("。").trim().slice(0,1000);
+    if (description.length < 12 || !stagingToken.trim()) {
+      addToast("請輸入至少12字的虛構需求與本機客戶測試權杖", "error"); return;
+    }
+    try {
+      const response = await fetch("/legacy/requests", {
+        method:"POST", cache:"no-store",
+        headers:{"Content-Type":"application/json",Authorization:"Bearer "+stagingToken.trim()},
+        body:JSON.stringify({categoryId:category.id,region,description})
+      });
+      const result = await response.json().catch(()=>({}));
+      if (!response.ok) throw new Error("HTTP "+response.status);
+      addToast("已送交後端待審核，沒有收取訂金或完成付款", "success");
+      setStagingToken(""); onClose();
+    } catch (error) { addToast("隔離 API 未完成發案："+error.message, "error"); }
   };
 
   const handleAi = () => {
@@ -2098,6 +2078,11 @@ const ClientCreateJob = ({ onClose }) => {
           <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
         </div>
 
+        <div className="px-6 py-3 bg-amber-50 border-b border-amber-100">
+          <p className="text-xs font-bold text-amber-800">M1b 本機測試｜只填虛構資料，地區僅限縣市；不會付款或扣錢包</p>
+          <label htmlFor="m1b-token" className="text-xs text-amber-900">隔離客戶測試權杖（不儲存）</label>
+          <input id="m1b-token" type="password" autoComplete="off" value={stagingToken} onChange={e=>setStagingToken(e.target.value)} className="input-modern mt-2" />
+        </div>
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="text-xs font-bold text-slate-500 mb-2 block">工程類別</label>
