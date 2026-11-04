@@ -1677,6 +1677,8 @@ const ClientCreateJob = ({ onClose }) => {
     items: {},
     customItems: [],
   });
+  const [stagingToken, setStagingToken] = useState("");
+  const submissionLockRef = useRef(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
 
   const { addToast } = useToast();
@@ -1759,56 +1761,73 @@ const ClientCreateJob = ({ onClose }) => {
     }));
   };
 
-  const handleSubmit = () => {
-    if (!form.title || !form.type || !form.address) {
-      addToast("請填寫完整資訊", "error");
+  const handleSubmit = async () => {
+    // M1c-C RESEARCH_ONLY: original React -> synthetic short session -> API -> revoke.
+    if (submissionLockRef.current) return;
+    if (window.__CLOUDLINK_M1B_STAGING_ENABLED__ !== true ||
+        !["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+      addToast("此流程只允許本機隔離測試，無付款與正式登入", "error"); return;
+    }
+    const category = PROJECT_CATEGORIES.find(item => item.label === form.type);
+    if (!category || !["net", "cctv", "access"].includes(category.id)) {
+      addToast("工程類別未通過隔離相容驗證", "error"); return;
+    }
+    const region = String(form.address || "").trim();
+    if (!/^[\u4e00-\u9fff]{2,5}[縣市]$/.test(region)) {
+      addToast("只填縣市級的虛構地區，不能填真實街道地址", "error"); return;
+    }
+    const description = [form.title, form.desc].filter(Boolean).join("。").trim().slice(0,1000);
+    const bootstrap = stagingToken.trim();
+    if (description.length < 12 || !bootstrap) {
+      addToast("請輸入虛構需求與一次性本機測試權杖", "error"); return;
+    }
+    submissionLockRef.current = true;
+    setStagingToken(""); // do not retain the bootstrap string in the form after submit
+    let shortSession = null;
+    let created = false;
+    let revoked = true;
+    try {
+      const loginResponse = await fetch("/staging/session", {
+        method: "POST", cache: "no-store",
+        headers: {Authorization: "Bearer " + bootstrap}
+      });
+      if (!loginResponse.ok) throw new Error("隔離 Session 交換 HTTP " + loginResponse.status);
+      const login = await loginResponse.json().catch(() => ({}));
+      if (typeof login.access_token !== "string" || login.access_token.length < 32)
+        throw new Error("隔離 Session 回應不完整");
+      shortSession = login.access_token;
+      const response = await fetch("/legacy/requests", {
+        method: "POST", cache: "no-store",
+        headers: {"Content-Type": "application/json", Authorization: "Bearer " + shortSession},
+        body: JSON.stringify({categoryId: category.id, region, description})
+      });
+      if (!response.ok) throw new Error("發案 API HTTP " + response.status);
+      const result = await response.json().catch(() => ({}));
+      if (!result.id || result.state !== "PENDING") throw new Error("後端未回傳待審核案件證據");
+      created = true;
+    } catch (error) {
+      addToast("隔離流程沒有完成：" + error.message, "error");
+    } finally {
+      if (shortSession) {
+        try {
+          const revokedResponse = await fetch("/staging/session/revoke", {
+            method: "POST", cache: "no-store",
+            headers: {Authorization: "Bearer " + shortSession}
+          });
+          if (!revokedResponse.ok) revoked = false;
+        } catch (_revokeError) { revoked = false; }
+      }
+      submissionLockRef.current = false;
+    }
+    if (!revoked) {
+      addToast(created ? "案件已送出，但短效憑證撤銷未確認，請勿繼續測試" :
+        "Session 撤銷未確認，請停止本機測試", "error");
       return;
     }
-
-    const labor = Number.parseInt(form.labor, 10) || 0;
-    const material = Number.parseInt(form.material, 10) || 0;
-    const total = labor + material;
-
-    if (total <= 0) {
-      addToast("請設定預算金額", "error");
-      return;
+    if (created) {
+      addToast("案件已送交後端待審核；短效憑證已撤銷；沒有收款", "success");
+      onClose();
     }
-
-    const deposit = calcDeposit(total);
-    const tail = total - deposit;
-
-    const wallet = Number(user.wallet) || 0;
-    if (wallet < deposit) {
-      addToast(`錢包餘額不足，訂金需要 ${formatCurrency(deposit)}`, "error");
-      return;
-    }
-
-    updateUser({ ...user, wallet: wallet - deposit });
-
-    addJob({
-      id: `J-${Date.now()}`,
-      title: form.title,
-      type: form.type,
-      address: form.address,
-      desc: form.desc,
-      scheduledDate: form.date,
-      status: "open",
-      clientId: user.id,
-      clientName: user.name,
-      laborBudget: labor,
-      materialBudget: material,
-      deposit_paid: true,
-      depositAmount: deposit,
-      tailAmount: tail,
-      created_at: new Date().toISOString(),
-      customItems: form.customItems || [],
-      materials: [],
-      photos: [],
-      signature: null,
-    });
-
-    addToast(`訂金已支付 ${formatCurrency(deposit)}，已成功發案`, "success");
-    onClose();
   };
 
   const handleAi = () => {
@@ -1830,6 +1849,11 @@ const ClientCreateJob = ({ onClose }) => {
           <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><Icon name="x" /></button>
         </div>
 
+        <div className="px-6 py-3 bg-amber-50 border-b border-amber-100">
+          <p className="text-xs font-bold text-amber-800">M1b 本機測試｜只填虛構資料，地區僅限縣市；不會付款或扣錢包</p>
+          <label htmlFor="m1b-token" className="text-xs text-amber-900">隔離客戶測試權杖（不儲存）</label>
+          <input id="m1b-token" type="password" autoComplete="off" value={stagingToken} onChange={e=>setStagingToken(e.target.value)} className="input-modern mt-2" />
+        </div>
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="text-xs font-bold text-slate-500 mb-2 block">工程類別</label>
