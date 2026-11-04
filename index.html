@@ -1946,6 +1946,7 @@ const ClientCreateJob = ({ onClose }) => {
     customItems: [],
   });
   const [stagingToken, setStagingToken] = useState("");
+  const submissionLockRef = useRef(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
 
   const { addToast } = useToast();
@@ -2029,34 +2030,72 @@ const ClientCreateJob = ({ onClose }) => {
   };
 
   const handleSubmit = async () => {
-    // M1b isolated feature branch: never run the old demo-wallet payment flow.
+    // M1c-C RESEARCH_ONLY: original React -> synthetic short session -> API -> revoke.
+    if (submissionLockRef.current) return;
     if (window.__CLOUDLINK_M1B_STAGING_ENABLED__ !== true ||
-        !["localhost","127.0.0.1"].includes(window.location.hostname)) {
-      addToast("舊版模擬付款已停用；請由本機 M1b 隔離入口測試", "error"); return;
+        !["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+      addToast("此流程只允許本機隔離測試，無付款與正式登入", "error"); return;
     }
     const category = PROJECT_CATEGORIES.find(item => item.label === form.type);
-    if (!category || !["net","cctv","access"].includes(category.id)) {
-      addToast("這個工程類別尚未完成後端相容驗證", "error"); return;
+    if (!category || !["net", "cctv", "access"].includes(category.id)) {
+      addToast("工程類別未通過隔離相容驗證", "error"); return;
     }
     const region = String(form.address || "").trim();
     if (!/^[\u4e00-\u9fff]{2,5}[縣市]$/.test(region)) {
-      addToast("隔離測試僅可填縣市，例如台南市；不可輸入實際地址", "error"); return;
+      addToast("只填縣市級的虛構地區，不能填真實街道地址", "error"); return;
     }
     const description = [form.title, form.desc].filter(Boolean).join("。").trim().slice(0,1000);
-    if (description.length < 12 || !stagingToken.trim()) {
-      addToast("請輸入至少12字的虛構需求與本機客戶測試權杖", "error"); return;
+    const bootstrap = stagingToken.trim();
+    if (description.length < 12 || !bootstrap) {
+      addToast("請輸入虛構需求與一次性本機測試權杖", "error"); return;
     }
+    submissionLockRef.current = true;
+    setStagingToken(""); // do not retain the bootstrap string in the form after submit
+    let shortSession = null;
+    let created = false;
+    let revoked = true;
     try {
-      const response = await fetch("/legacy/requests", {
-        method:"POST", cache:"no-store",
-        headers:{"Content-Type":"application/json",Authorization:"Bearer "+stagingToken.trim()},
-        body:JSON.stringify({categoryId:category.id,region,description})
+      const loginResponse = await fetch("/staging/session", {
+        method: "POST", cache: "no-store",
+        headers: {Authorization: "Bearer " + bootstrap}
       });
-      const result = await response.json().catch(()=>({}));
-      if (!response.ok) throw new Error("HTTP "+response.status);
-      addToast("已送交後端待審核，沒有收取訂金或完成付款", "success");
-      setStagingToken(""); onClose();
-    } catch (error) { addToast("隔離 API 未完成發案："+error.message, "error"); }
+      if (!loginResponse.ok) throw new Error("隔離 Session 交換 HTTP " + loginResponse.status);
+      const login = await loginResponse.json().catch(() => ({}));
+      if (typeof login.access_token !== "string" || login.access_token.length < 32)
+        throw new Error("隔離 Session 回應不完整");
+      shortSession = login.access_token;
+      const response = await fetch("/legacy/requests", {
+        method: "POST", cache: "no-store",
+        headers: {"Content-Type": "application/json", Authorization: "Bearer " + shortSession},
+        body: JSON.stringify({categoryId: category.id, region, description})
+      });
+      if (!response.ok) throw new Error("發案 API HTTP " + response.status);
+      const result = await response.json().catch(() => ({}));
+      if (!result.id || result.state !== "PENDING") throw new Error("後端未回傳待審核案件證據");
+      created = true;
+    } catch (error) {
+      addToast("隔離流程沒有完成：" + error.message, "error");
+    } finally {
+      if (shortSession) {
+        try {
+          const revokedResponse = await fetch("/staging/session/revoke", {
+            method: "POST", cache: "no-store",
+            headers: {Authorization: "Bearer " + shortSession}
+          });
+          if (!revokedResponse.ok) revoked = false;
+        } catch (_revokeError) { revoked = false; }
+      }
+      submissionLockRef.current = false;
+    }
+    if (!revoked) {
+      addToast(created ? "案件已送出，但短效憑證撤銷未確認，請勿繼續測試" :
+        "Session 撤銷未確認，請停止本機測試", "error");
+      return;
+    }
+    if (created) {
+      addToast("案件已送交後端待審核；短效憑證已撤銷；沒有收款", "success");
+      onClose();
+    }
   };
 
   const handleAi = () => {
