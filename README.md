@@ -38,3 +38,9 @@
 - 在受控 V8 隔離環境，直接抽取上傳 GitHub 後的 React 處理器，驗證 **11/11 邏輯案例 PASS**，且兩份來源完全一致；並附 [Node 原始碼契約測試](tests/m1cc_legacy_session_flow.test.mjs)（`node --test tests/m1cc_legacy_session_flow.test.mjs`）。**目前未取得 Node/GitHub CI 實際執行證據，沒有原版整頁瀏覽器 E2E。**
 - 對照 [YC Tech Match 後端 Contract 測試](https://github.com/punk8895022-byte/yc-tech-smartdispatch/blob/feature/asset-os-dual-platforms-20261031/pocs/cloudlink-staging-api/tests/test_m1cc_react_legacy_session_contract.py)；[跨專案 AI OS 研究吸收 Draft PR](https://github.com/punk8895022-byte/xiaoyun-ai-os/pull/35)。
 - 本分支 Draft PR [#1](https://github.com/punk8895022-byte/yuntech-prototype/pull/1) 保留，不合併、未部署、不收款；Owner Gate CLOSED。M1c-C `SOURCE_HANDLER_UNIT_PASS`，`ORIGINAL_REACT_BROWSER_E2E_NOT_RUN`。
+
+## 2026-11-10｜跨專案安全證據 Skill 研究入口
+- 專案 Skill 與 MD 唯一版本化來源：https://github.com/punk8895022-byte/xiaoyun-ai-skills/blob/research/xy-secure-evidence-skills-20261110/projects/cloudlink-session-bridge/00_README.md
+- Skill Center Google Drive 索引：https://drive.google.com/drive/folders/1a1l2ENBxMDfrYuIxBet3TUKCuf03lDD3
+- 技能庫 Draft PR #123：https://github.com/punk8895022-byte/xiaoyun-ai-skills/pull/123
+- 這是 RESEARCH_ONLY 的文件治理接線，不表示任何 Runtime 已安裝、GitHub CI 已驗證或 Owner Gate 已開放；本專案 Draft PR 不合併、不部署。
