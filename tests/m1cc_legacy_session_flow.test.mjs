@@ -127,3 +127,15 @@ test("original React UI and user guidance never claim a deposit or escrow for sy
     assert.doesNotMatch(text, /確認金額無誤後，點擊 \[支付訂金/);
   }
 });
+
+
+test("prototype admin password fields mask display and wallet edits stay clearly demo-only", () => {
+  for (const file of ["index.html", "app.jsx"]) {
+    const text = readFileSync(new URL("../" + file, import.meta.url), "utf8");
+    assert.match(text, /type="password" autoComplete="new-password" value=\{form\.password\}/);
+    assert.match(text, /type="password" autoComplete="new-password" value=\{form\.password \|\| ""\}/);
+    assert.match(text, /示範錢包額度（非真實金流）/);
+    assert.match(text, /示範錢包餘額（非真實金流）/);
+    assert.doesNotMatch(text, /<input className="input-modern" value=\{form\.password/);
+  }
+});
