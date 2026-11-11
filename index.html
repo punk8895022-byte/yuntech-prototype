@@ -1294,9 +1294,9 @@ const SignaturePad = ({ value, onChange }) => {
 
 客戶可自行微調工資與材料費，系統會自動加總「總預算」。
 
-步驟三：支付訂金
+步驟三：送出隔離測試需求（不付款）
 
-確認金額無誤後，點擊 [支付訂金 (30%) 並發布]。系統採第三方託管機制，保障雙方權益。發布後案件會進入「媒合中」狀態。
+在本機 /legacy-react 隔離模式填入虛構需求與一次性測試權杖，點擊 [送出模擬案件（不付款）]。系統僅將合成案件送至後端待審核（PENDING），不支援支付訂金、錢包扣款或第三方託管；正式交易與履約流程尚未啟用。
 
 2. 案件追蹤與驗收
 
@@ -2209,7 +2209,7 @@ const ClientCreateJob = ({ onClose }) => {
         </div>
 
         <div className="p-6 border-t border-slate-50">
-          <button onClick={handleSubmit} className="w-full btn btn-primary shadow-xl shadow-indigo-200">支付訂金 (30%) 並發布</button>
+          <button onClick={handleSubmit} className="w-full btn btn-primary shadow-xl shadow-indigo-200">送出模擬案件（不付款）</button>
         </div>
       </div>
     </div>
