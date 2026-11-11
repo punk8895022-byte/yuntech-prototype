@@ -1,0 +1,31 @@
+name: CloudLink M1c-C synthetic UI safety checks
+on:
+  push:
+    branches:
+      - feature/cloudlink-m1b-react-api-20261031
+    paths:
+      - index.html
+      - app.jsx
+      - tests/m1cc_legacy_session_flow.test.mjs
+      - .github/workflows/cloudlink-m1cc-staging-checks.yml
+  pull_request:
+    paths:
+      - index.html
+      - app.jsx
+      - tests/m1cc_legacy_session_flow.test.mjs
+      - .github/workflows/cloudlink-m1cc-staging-checks.yml
+permissions:
+  contents: read
+jobs:
+  synthetic-ui-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout review branch
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Isolated handler and no-fake-payment label tests
+        run: node --test tests/m1cc_legacy_session_flow.test.mjs
