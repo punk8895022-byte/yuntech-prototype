@@ -5054,10 +5054,10 @@ const AdminView = ({ user }) => {
 
             <div>
               <label className="text-xs font-bold text-slate-500 block mb-1">密碼</label>
-              <input className="input-modern" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+              <input className="input-modern" type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">錢包</label>
+              <label className="text-xs font-bold text-slate-500 block mb-1">示範錢包額度（非真實金流）</label>
               <input className="input-modern" type="number" value={form.wallet} onChange={(e) => setForm({ ...form, wallet: e.target.value })} />
             </div>
 
@@ -5435,12 +5435,12 @@ const AdminView = ({ user }) => {
             )}
 
             <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">錢包餘額</label>
+              <label className="text-xs font-bold text-slate-500 block mb-1">示範錢包餘額（非真實金流）</label>
               <input className="input-modern" type="number" value={Number(form.wallet) || 0} onChange={(e) => setForm({ ...form, wallet: Number(e.target.value) || 0 })} />
             </div>
             <div>
               <label className="text-xs font-bold text-slate-500 block mb-1">密碼</label>
-              <input className="input-modern" value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+              <input className="input-modern" type="password" autoComplete="new-password" value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} />
             </div>
           </div>
 
