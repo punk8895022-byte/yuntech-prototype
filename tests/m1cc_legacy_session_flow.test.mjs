@@ -111,3 +111,19 @@ test("concurrent double-submit is serialized while session exchange is pending",
   assert.equal(t.calls.length,3); assert.equal(t.lock.current,false);
   assert.equal(t.closed(),1);
 });
+
+
+test("original React UI and user guidance never claim a deposit or escrow for synthetic cases", () => {
+  for (const file of ["index.html", "app.jsx"]) {
+    const text = readFileSync(new URL("../" + file, import.meta.url), "utf8").replace(/\r\n/g,"\n");
+    const start = text.indexOf("const ClientCreateJob =");
+    const end = text.indexOf("const ClientEditJobModal", start);
+    assert.ok(start > -1 && end > start, file + ": original form section changed");
+    const page = text.slice(start, end);
+    assert.match(page, />送出模擬案件（不付款）<\/button>/);
+    assert.doesNotMatch(page, /支付訂金 \(30%\) 並發布/);
+    assert.doesNotMatch(page, /系統採第三方託管機制/);
+    assert.match(text, /步驟三：送出隔離測試需求（不付款）/);
+    assert.doesNotMatch(text, /確認金額無誤後，點擊 \[支付訂金/);
+  }
+});
